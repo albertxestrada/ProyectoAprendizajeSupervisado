@@ -22,45 +22,91 @@ from config import CLASSIFICATION_LABELS, TARGET_MAE, TARGET_MACRO_F1, RESULTS_D
 # ============================================================================
 
 def classification_metrics(y_true, y_pred, labels=CLASSIFICATION_LABELS) -> dict:
-    """
-    Calcula metricas de clasificacion principales.
-
-    Returns:
-        dict con accuracy, macro_f1, weighted_f1, per_class_report, meets_target.
-
-    TODO (Alberto):
-        - Usar sklearn: accuracy_score, f1_score, classification_report
-        - meets_target = macro_f1 >= TARGET_MACRO_F1
-    """
-    raise NotImplementedError("Pendiente: Alberto")
+    from sklearn.metrics import accuracy_score, f1_score, classification_report
+    
+    report = classification_report(y_true, y_pred, labels=labels, 
+                                   output_dict=True, zero_division=0)
+    macro = f1_score(y_true, y_pred, average="macro", zero_division=0)
+    
+    return {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "macro_f1": macro,
+        "weighted_f1": f1_score(y_true, y_pred, average="weighted", zero_division=0),
+        "per_class_report": report,
+        "meets_target": macro >= TARGET_MACRO_F1,
+    }
 
 
 def plot_confusion_matrix(y_true, y_pred, labels=CLASSIFICATION_LABELS,
                           title="Confusion Matrix", save_path=None,
                           normalize=True):
-    """
-    Genera y guarda la matriz de confusion.
-    Si normalize=True, muestra porcentajes por fila (recall por clase).
-
-    TODO (Alberto):
-        - Usar sklearn.metrics.confusion_matrix + seaborn.heatmap
-        - Guardar figura si save_path no es None
-    """
-    raise NotImplementedError("Pendiente: Alberto")
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.metrics import confusion_matrix
+    
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+    
+    if normalize:
+        cm_display = cm.astype("float") / cm.sum(axis=1, keepdims=True)
+        cm_display = np.nan_to_num(cm_display)
+        fmt = ".2%"
+    else:
+        cm_display = cm
+        fmt = "d"
+    
+    fig, ax = plt.subplots(figsize=(12, 10))
+    sns.heatmap(cm_display, annot=True, fmt=fmt, cmap="Blues",
+                xticklabels=labels, yticklabels=labels, ax=ax)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    ax.set_title(title)
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    
+    if save_path:
+        from pathlib import Path
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    
+    plt.show()
+    return fig
 
 
 def plot_per_class_f1(y_true, y_pred, labels=CLASSIFICATION_LABELS,
                       title="F1-Score por Clase", save_path=None):
-    """
-    Grafico de barras con F1 por cada clase de retraso.
-    Incluir linea horizontal del TARGET_MACRO_F1 como referencia.
-
-    TODO (Alberto):
-        - classification_report con output_dict=True
-        - Grafico de barras + axhline del target
-    """
-    raise NotImplementedError("Pendiente: Alberto")
-
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import classification_report
+    
+    report = classification_report(y_true, y_pred, labels=labels,
+                                   output_dict=True, zero_division=0)
+    
+    classes = [l for l in labels if l in report]
+    f1_scores = [report[l]["f1-score"] for l in classes]
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
+    bars = ax.bar(classes, f1_scores, color="steelblue", edgecolor="white")
+    ax.axhline(y=TARGET_MACRO_F1, color="red", linestyle="--",
+               label=f"Target Macro F1 = {TARGET_MACRO_F1}")
+    ax.set_xlabel("Clase de Retraso")
+    ax.set_ylabel("F1-Score")
+    ax.set_title(title)
+    ax.legend()
+    ax.set_ylim(0, 1.05)
+    plt.xticks(rotation=45, ha="right")
+    
+    for bar, score in zip(bars, f1_scores):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+                f"{score:.3f}", ha="center", va="bottom", fontsize=9)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        from pathlib import Path
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    
+    plt.show()
+    return fig
 
 # ============================================================================
 # Metricas de Regresion — Dylan
