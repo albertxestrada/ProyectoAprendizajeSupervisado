@@ -120,6 +120,7 @@ flight-delay-prediction/
 | `data/data_contract.md` | **Listo** | Documentacion de las 3 fuentes con placeholders para SHA-256 |
 | `data/raw/download_data.py` | **Listo** | Script de descarga (BTS manual + Open-Meteo/IEM automaticos) |
 | `results/experiment_log.md` | **Listo** | Plantilla de tracking |
+| `notebooks/04_classification.ipynb` | **Listo** | Notebook completo de clasificación — 9 experimentos, balanceo, optimización, exportación de prob. |
 
 ### Por implementar (stubs con `raise NotImplementedError`)
 
@@ -128,7 +129,7 @@ flight-delay-prediction/
 | `src/data_loading.py` | `load_bts()`, `load_open_meteo()`, `load_iem()` | Juan Camilo |
 | `src/preprocessing.py` | `convert_crs_to_utc()`, `build_classification_label()`, `separate_cancelled_operated()`, `temporal_join_weather()`, `split_temporal()`, `save_splits()` | Juan Camilo |
 | `src/feature_engineering.py` | `compute_bearing()`, `add_flight_bearing()`, `add_headwind_component()`, `add_cyclical_time()`, `add_day_of_week()`, `add_month_cyclical()`, `add_holiday_flag()`, `add_hub_congestion()`, `apply_all_features()` | Juan Camilo |
-| `src/evaluation.py` | `classification_metrics()`, `plot_confusion_matrix()`, `plot_per_class_f1()` | Alberto |
+| `src/evaluation.py` | `classification_metrics()`, `plot_confusion_matrix()`, `plot_per_class_f1()` | ~~Alberto~~ ✅ |
 | `src/evaluation.py` | `regression_metrics()`, `plot_predicted_vs_actual()`, `plot_residuals()` | Dylan |
 | `src/evaluation.py` | `model_comparison_table()`, `save_comparison_table()` | Hector |
 
