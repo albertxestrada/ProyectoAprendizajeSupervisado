@@ -59,42 +59,35 @@ IATA_TO_ICAO = {
 
 
 def download_bts():
-    """
-    BTS On-Time Performance — REQUIERE DESCARGA MANUAL.
+    """Descarga los 12 zips mensuales de BTS (2024) y los guarda como CSV."""
+    import requests
+    import zipfile
+    from io import BytesIO
 
-    Instrucciones:
-    1. Ir a: https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoession_VQ=FGJ
-    2. Seleccionar "Reporting Carrier On-Time Performance (1987-present)"
-    3. Periodo: Enero 2024 a Diciembre 2024 (un mes a la vez)
-    4. Seleccionar los campos listados en data/data_contract.md
-    5. Descargar y guardar cada CSV en data/raw/bts/
-    6. Nombrar como: on_time_2024_01.csv, on_time_2024_02.csv, ...
+    output_dir = PROJECT_ROOT / "data" / "raw" / "bts"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    Despues de descargar, registrar hashes SHA-256 en data/data_contract.md
-    """
-    print("=" * 60)
-    print("  BTS On-Time Performance — DESCARGA MANUAL")
-    print("=" * 60)
-    print()
-    print("La descarga de BTS requiere interaccion manual con el sitio web.")
-    print()
-    print("Pasos:")
-    print("1. Abrir: https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoession_VQ=FGJ")
-    print("2. Seleccionar tabla: 'Reporting Carrier On-Time Performance'")
-    print("3. Periodo: Enero-Diciembre 2024 (descargar por mes)")
-    print("4. Campos necesarios:")
-    print("   FlightDate, Reporting_Airline, Origin, Dest, CRSDepTime,")
-    print("   CRSArrTime, CRSElapsedTime, DepDelay, ArrDelay, AirTime,")
-    print("   Distance, CarrierDelay, WeatherDelay, NASDelay, SecurityDelay,")
-    print("   LateAircraftDelay, Cancelled, CancellationCode, Diverted,")
-    print("   Marketing_Airline_Network, OriginCityName, DestCityName,")
-    print("   OriginState, DestState")
-    print("5. Guardar en: data/raw/bts/on_time_2024_MM.csv")
-    print()
-    print("Despues de descargar, ejecutar:")
-    print("  from src.utils import file_sha256")
-    print("  file_sha256('data/raw/bts/on_time_2024_01.csv')")
-    print("y registrar los hashes en data/data_contract.md")
+    base = ("https://transtats.bts.gov/PREZIP/"
+            "On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{y}_{m}.zip")
+
+    for month in range(1, 13):
+        target = output_dir / f"on_time_2024_{month:02d}.csv"
+        if target.exists():
+            print(f"  {target.name} ya existe, se omite")
+            continue
+
+        url = base.format(y=2024, m=month)
+        print(f"  Descargando mes {month:02d}...")
+        try:
+            resp = requests.get(url, timeout=300)
+            resp.raise_for_status()
+            with zipfile.ZipFile(BytesIO(resp.content)) as zf:
+                csv_name = [n for n in zf.namelist() if n.endswith(".csv")][0]
+                with zf.open(csv_name) as src, open(target, "wb") as dst:
+                    dst.write(src.read())
+            print(f"    OK: {target.name}")
+        except Exception as e:
+            print(f"    ERROR mes {month:02d}: {e}")
 
 
 def download_open_meteo():
