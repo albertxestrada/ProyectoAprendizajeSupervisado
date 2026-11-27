@@ -335,7 +335,7 @@ Cada fila enlaza con su detalle en la §11. Hasta dónde va cada tarea está en 
 | [B2](#b2--importar-sin-syspath) | Importar sin `sys.path` y descubrir las pruebas | Alberto | Camilo | `tests/__init__.py` |
 | [B3](#b3--una-sola-fuente-de-aeropuertos) | Una sola fuente de aeropuertos | Camilo | — | `data/reference/airports.csv` |
 | [B4](#b4--constantes-en-configpy) | Constantes en `config.py` | Camilo | — | `config.py` |
-| [B5](#b5--entorno-fijado) | Entorno fijado | Dylan | — | `requirements.txt`, `.python-version` |
+| [B5](#b5--entorno-fijado) | Entorno fijado | Dylan | — | `pyproject.toml`, `uv.lock`, `requirements.txt`, `.python-version` |
 | [B6](#b6--descarga-que-falla-en-voz-alta) | Descarga que falla en voz alta | Camilo | Emilio | `data/raw/download_data.py` |
 | [B7](#b7--pruebas-separadas) | Pruebas separadas por tipo | Dylan | Camilo | `tests/` |
 | [B8](#b8--datos-compartidos) | Datos compartidos y verificables | Emilio | Camilo | `data/manifest.csv`, `data/raw/fetch_data.py` |
@@ -420,8 +420,9 @@ ProyectoAprendizajeSupervisado/
 ├── .python-version                    B5 · Dylan
 ├── README.md                          punto de entrada: cómo ejecutar
 ├── config.py                          única fuente de fechas, horizonte y lista blanca
-├── pyproject.toml                     B2 · imports sin sys.path
-├── requirements.txt                   versiones exactas (B5)
+├── pyproject.toml                     dependencias (B5); paquete instalable (B2)
+├── requirements.txt                   para pip; se genera desde uv.lock (B5)
+├── uv.lock                            versiones exactas (B5)
 ├── data/
 │   ├── data_contract.md               P1 · Emilio
 │   ├── manifest.csv                   B8 · sha256, URL y fecha de cada crudo
@@ -569,7 +570,8 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 - **Responsable:** Alberto, con Camilo.
 - **Qué:**
   - Quitar `sys.path.append` de los cinco módulos de `src/`, de `data/raw/download_data.py` y del notebook 04.
-  - Un `pyproject.toml` mínimo que declare el paquete `src` y el módulo `config`, y `pip install -e .` en cada máquina. Así `from src…` e `import config` funcionan desde la raíz, desde `tests/` y desde los notebooks.
+  - Sobre el `pyproject.toml` que ya existe (B5), no uno nuevo: quitar `package = false`, añadir un `[build-system]` y declarar el paquete `src` y el módulo `config`. Así `from src…` e `import config` funcionan desde la raíz, desde `tests/` y desde los notebooks.
+  - Después, `uv lock` y regenerar `requirements.txt` con el comando del README. Con uv, `uv sync` instala el proyecto en modo editable; con pip, `pip install -e .`.
   - Ejecutar desde la raíz no basta para los notebooks: el kernel arranca en `notebooks/` aunque Jupyter se lance desde la raíz.
   - Crear `tests/__init__.py`. Sin él, `python -m unittest` desde la raíz no encuentra ninguna prueba (comprobado con Python 3.12).
 - **Hecho cuando:** `python -m unittest` desde la raíz corre las pruebas, y el notebook 04 importa de `src` sin tocar `sys.path`.
@@ -590,9 +592,12 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 #### B5 · Entorno fijado
 
 - **Responsable:** Dylan.
-- **Qué:** versiones exactas en `requirements.txt` (`==`), sacadas del entorno donde corren los notebooks; versión de Python en `.python-version` y en el README.
+- **Qué:**
+  - `pyproject.toml` es la única lista de dependencias y el único archivo que se edita a mano. Sus límites superiores se comprobaron ejecutando las pruebas y los notebooks.
+  - `uv.lock` guarda las versiones exactas para uv. `requirements.txt` lleva las mismas para pip y se genera desde `uv.lock` con el comando del README; no se edita a mano.
+  - Python 3.12 en `.python-version` y en el README.
 - **Por qué:** con `>=`, el profesor puede instalar una versión de scikit-learn que cambia resultados o argumentos [Enunciado, reproducibilidad].
-- **Hecho cuando:** un entorno nuevo instalado desde `requirements.txt` corre las pruebas y el notebook 03.
+- **Hecho cuando:** un entorno nuevo, instalado con uv o con pip, corre las pruebas y el notebook 03.
 
 #### B6 · Descarga que falla en voz alta
 

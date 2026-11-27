@@ -2,7 +2,7 @@
 
 Qué está hecho y qué falta en cada tarea. El [plan](PLAN.md) dice qué hacer, quién y por qué; este archivo dice solo hasta dónde se ha llegado.
 
-**Última revisión:** `main` en `7338495`, con las ramas `dylan_branch` (`f9b05d1`), `emilio_branch` y `feature/clasificacion-alberto`.
+**Última revisión:** `main` en `cf08ff1`, con las ramas `dylan_branch`, `camilo_branch`, `emilio_branch` y `feature/clasificacion-alberto`. Los últimos cambios de `camilo_branch` y `emilio_branch` aún no están reflejados: cada uno actualiza sus filas en su PR.
 
 > **Dónde estamos.** La descarga y los cargadores funcionan, y los siete arreglos de la reunión están hechos. Falta casi todo lo que viene después de cargar.
 >
