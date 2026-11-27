@@ -87,3 +87,7 @@ TARGET_MACRO_F1 = 0.55
 # Parametros de Open-Meteo (nivel de presion para jet stream)
 # =============================================================================
 PRESSURE_LEVEL_HPA = 250  # Nivel de crucero para vientos en altura
+
+# Periodo de datos del proyecto
+DATA_START = "2024-02-01"
+DATA_END = "2025-12-31"

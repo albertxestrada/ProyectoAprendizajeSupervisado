@@ -23,7 +23,7 @@ def _read_all(subdir: str) -> pd.DataFrame:
     return pd.concat((pd.read_csv(f, low_memory=False) for f in files), ignore_index=True)
 
 
-def load_bts(months: list[int] | None = None, drop_leakage:bool = True) -> pd.DataFrame:
+def load_bts(months: list[int] | None = None, drop_leakage: bool = False) -> pd.DataFrame:
     """
     Carga los CSVs mensuales de BTS On-Time Performance.
 
@@ -61,9 +61,19 @@ def load_open_meteo() -> pd.DataFrame:
         - Concatenar si hay multiples archivos
     """
     df = _read_all("open_meteo")
-    df = df.rename(columns={"time": "timestamp_utc", "station": "airport"})
-    df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True)
-    return df.sort_values(["station","time"]).reset_index(drop=True)
+    df = df.rename(columns={
+        "time": "timestamp_utc",
+        "timestamp": "timestamp_utc",
+        "station": "airport",
+    })
+    if "timestamp_utc" not in df.columns:
+        raise ValueError("Open-Meteo no contiene una columna de tiempo reconocible")
+    if "airport" not in df.columns:
+        raise ValueError("Open-Meteo no contiene una columna de aeropuerto reconocible")
+    df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True, errors="coerce")
+    df = df.dropna(subset=["timestamp_utc"])
+    df["station"] = df["airport"]
+    return df.sort_values(["airport", "timestamp_utc"]).reset_index(drop=True)
 
 
 def load_iem() -> pd.DataFrame:
@@ -81,18 +91,22 @@ def load_iem() -> pd.DataFrame:
         - Parsear columna 'valid' a datetime UTC
     """
     df = _read_all("iem")
-    df = df.rename(columns={"valid": "time", "station": "station_icao","airpot_iata": "station"})
-    df["time"] = pd.to_datetime(df["time"], utc=True,errors="coerce")
+    df = df.rename(columns={
+        "valid": "time",
+        "station": "station_icao",
+        "airport_iata": "station",
+    })
+    df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
     df = df.dropna(subset=["time"])
 
-    skip = ["time", "station", "station_icao"]
-    for col in skip or df[col].dtype != "object":
-        continue
-    cleaned = df[col].replace({"M": pd.NA, "T": pd.NA})
-    numeric = pd.to_numeric(cleaned, errors="coerce")
-
-    if cleaned.notna().sum() and numeric.notna().sum() >= 0.9 * cleaned.notna().sum():
-        df[col] = numeric.astype("float64")
-    else:
-        df[col] = cleaned
-    return df.sort_values(["station","time"]).reset_index(drop=True)
+    for col in df.columns:
+        if col in {"time", "station", "station_icao"}:
+            continue
+        if pd.api.types.is_object_dtype(df[col].dtype) or pd.api.types.is_string_dtype(df[col].dtype):
+            cleaned = df[col].replace({"M": pd.NA, "T": pd.NA})
+            numeric = pd.to_numeric(cleaned, errors="coerce")
+            if cleaned.notna().sum() > 0 and numeric.notna().sum() >= 0.9 * cleaned.notna().sum():
+                df[col] = numeric.astype("float64")
+            else:
+                df[col] = cleaned
+    return df.sort_values(["station", "time"]).reset_index(drop=True)

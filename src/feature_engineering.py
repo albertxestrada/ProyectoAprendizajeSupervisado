@@ -51,7 +51,7 @@ def compute_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float
     dl = np.radians(lon2) - np.radians(lon1)
     x = np.sin(dl) * np.cos(p2)
     y = np.cos(p1) * np.sin(p2) - np.sin(p1) * np.cos(p2) * np.cos(dl)
-    bearing = np.arctan2(y, x)+360
+    bearing = np.arctan2(x, y)
     return np.degrees(bearing) % 360
 
 
@@ -90,7 +90,7 @@ def add_headwind_component(
         df = add_flight_bearing(df)
     out = df.copy()
     rel = np.radians(out[wind_dir_col] - out["flight_bearing"])
-    out["headwind_component"] = out[wind_speed_col] * np.cos(rel)
+    out["headwind_component"] = -out[wind_speed_col] * np.cos(rel)
     out["crosswind_component"] = out[wind_speed_col] * np.sin(rel)
     return out
 
@@ -134,7 +134,7 @@ def add_month_cyclical(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.Dat
         DataFrame con 'month_sin', 'month_cos'.
     """
     out = df.copy()
-    month = pd.to_datetime(out[date_col]).dt.month
+    month = pd.to_datetime(out[date_col]).dt.month - 1
     out["month_sin"] = np.sin(2 * np.pi * month / 12)
     out["month_cos"] = np.cos(2 * np.pi * month / 12)
     return out
@@ -197,8 +197,20 @@ def apply_all_features(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame enriquecido con todas las features derivadas.
     """
     out = add_flight_bearing(df)
-    if {"wind_speed_250hPa", "wind_direction_250hPa"} <= set(out.columns):
-        out = add_headwind_component(out)
+    wind_speed_col = next(
+        (col for col in out.columns if col.startswith("wind_speed_250hPa")),
+        None,
+    )
+    wind_direction_col = next(
+        (col for col in out.columns if col.startswith("wind_direction_250hPa")),
+        None,
+    )
+    if wind_speed_col and wind_direction_col:
+        out = add_headwind_component(
+            out,
+            wind_speed_col=wind_speed_col,
+            wind_dir_col=wind_direction_col,
+        )
     out = add_cyclical_time(out)
     out = add_day_of_week(out)
     out = add_month_cyclical(out)

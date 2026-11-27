@@ -63,13 +63,22 @@ def convert_crs_to_utc(df: pd.DataFrame) -> pd.DataFrame:
     """
     out = df.copy()
     hhmm = pd.to_numeric(out["CRSDepTime"], errors="coerce")
-    hours = (hhmm//100).astype(64)
-    minutes = (hhmm%100).astype(64)
+    valid = (
+        hhmm.notna()
+        & hhmm.between(0, 2400, inclusive="both")
+        & (hhmm % 100).between(0, 59, inclusive="both")
+    )
+    hhmm = hhmm.fillna(0).astype("int64")
+    hours = hhmm // 100
+    minutes = hhmm % 100
+    next_day = hours == 24
+    hours = hours.where(~next_day, 0)
 
-    hours = hours.where(hours != 24, 0)
-    local = (pd.to_datetime(out["FlightDate"]).dt.normalize() 
-             + pd.to_timedelta(hours.astype("float"), unit="h")
-             + pd.to_timedelta(minutes.astype("float"), unit="m"))
+    local = (pd.to_datetime(out["FlightDate"]).dt.normalize()
+             + pd.to_timedelta(hours, unit="h")
+             + pd.to_timedelta(minutes, unit="m"))
+    local = local + pd.to_timedelta(next_day.astype("int64"), unit="D")
+    local = local.where(valid, pd.NaT)
     utc = pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")
     for iata,tz in AIRPORT_TIMEZONES.items():
         mask = out["Origin"] == iata
@@ -78,6 +87,7 @@ def convert_crs_to_utc(df: pd.DataFrame) -> pd.DataFrame:
             utc.loc[mask] = loc.dt.tz_convert("UTC")
     out["dep_datetime_utc"] = utc
     out["pred_datetime_utc"] = utc - pd.Timedelta(hours = PREDICTION_HORIZON_H)
+    out["prediction_time_utc"] = out["pred_datetime_utc"]
     return out
 
 
@@ -102,7 +112,7 @@ def build_classification_label(df: pd.DataFrame) -> pd.DataFrame:
     """
     needed_cols = ["Cancelled", "CancellationCode", "ArrDelay", "CarrierDelay",
                    "WeatherDelay", "NASDelay", "LateAircraftDelay"]
-    missing = needed_cols - set(df.columns)
+    missing = set(needed_cols) - set(df.columns)
     if missing:
         raise ValueError(f"Faltan columnas requeridas: {missing}")
 
@@ -122,10 +132,10 @@ def build_classification_label(df: pd.DataFrame) -> pd.DataFrame:
         "B": "Cancel_Weather",
         "C": "Cancel_NAS"
     })
-    delayed = (out["ArrDelay"] > 15)
+    delayed = out["ArrDelay"].fillna(0) >= 15
     out["delay_label"] = np.select(
-        [cancelled & cancel_label.notna(), delayed],
-        [cancel_label, dominant],
+        [cancelled & cancel_label.notna(), cancelled, delayed],
+        [cancel_label, "OnTime", dominant],
         default="OnTime"
     )
     assert set(out["delay_label"]) <= set(CLASSIFICATION_LABELS)
@@ -205,8 +215,8 @@ def split_temporal(
     """
     d = pd.to_datetime(df[date_col])
     train = df[d <= pd.Timestamp(TRAIN_END)]
-    val = df[(d > pd.Timestamp(VAL_START)) & (d <= pd.Timestamp(VAL_END))]
-    test = df[d > pd.Timestamp(TEST_START)]
+    val = df[(d >= pd.Timestamp(VAL_START)) & (d <= pd.Timestamp(VAL_END))]
+    test = df[d >= pd.Timestamp(TEST_START)]
     return train.copy(), val.copy(), test.copy()
 
 
