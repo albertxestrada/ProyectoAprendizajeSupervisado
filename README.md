@@ -1,8 +1,14 @@
-# Anticipando el Caos Aereo mediante Machine Learning
+# Anticipando el caos aéreo mediante machine learning
 
-> Sistema predictivo end-to-end que anticipa retrasos y estima la duracion real de vuelos domesticos en EE.UU., orientado a pasajeros que necesitan tomar decisiones horas antes del despegue.
+> Sistema predictivo de principio a fin que anticipa el tipo de demora y estima el tiempo real en el aire de vuelos domésticos en EE. UU., para pasajeros que deciden horas antes del despegue.
 
-**Universidad de Deusto** | Aprendizaje Automatico 2026-27
+**Universidad de Deusto** · Aprendizaje Automático 2026-27
+
+| Documento | Para qué sirve |
+|---|---|
+| `README.md` | Qué es el sistema y cómo se ejecuta |
+| [`PLAN.md`](PLAN.md) | Quién hace qué, flujos, estado actual y tabla de acción |
+| [`data/data_contract.md`](data/data_contract.md) | Fuentes, periodo, columnas y hashes de los datos crudos |
 
 ---
 
@@ -10,504 +16,314 @@
 
 | Integrante | Rol | Responsabilidad principal |
 |---|---|---|
-| Juan Camilo Bolanos Aldana | Datos & Feature Engineering | Pipeline de datos, join temporal, ingenieria de caracteristicas |
-| Alberto Estrada Guerrero | Clasificacion (1ro) | Modelos de clasificacion de tipo de demora, balanceo de clases |
-| Dylan Cantillo Arrieta | Regresion (2do) | Modelos de regresion de AirTime, usa prob. del clasificador como features |
-| Hector Emilio Gonzalez Gonzalez | Integracion & Memoria | Flujo jerarquico, memoria, reproducibilidad, defensa |
+| Juan Camilo Bolanos Aldana | Datos y feature engineering | Carga, etiquetas, cruce temporal con el clima, variables y partición |
+| Alberto Estrada Guerrero | Clasificación (primero en la cadena) | Tipo de demora, desbalance de clases, probabilidades para el regresor |
+| Dylan Cantillo Arrieta | Regresión (segundo en la cadena) | Tiempo en el aire, con y sin las probabilidades del clasificador |
+| Hector Emilio Gonzalez Gonzalez | Integración, memoria y apoyo en preprocesamiento | Contrato de datos, clima, calidad y datos compartidos; flujo jerárquico, memoria y defensa |
+
+El reparto tarea por tarea está en [PLAN.md · Quién hace qué](PLAN.md#4-quién-hace-qué) y en la [tabla de acción](PLAN.md#7-tabla-de-acción).
 
 ---
 
-## Arquitectura del sistema
+## Arquitectura
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
-    subgraph ENTRADA["DATOS DE ENTRADA (4h antes del vuelo)"]
-        BTS["BTS On-Time\nHorarios, aeropuerto,\naerolinea, matricula"]
-        OM["Open-Meteo Previous Runs\nViento 250 hPa,\nclima en superficie"]
-        IEM["IEM ASOS/METAR\nTecho de nubes,\nvisibilidad"]
+    subgraph ENTRADA["Datos disponibles 4 h antes de la salida"]
+        BTS["BTS On-Time<br>horarios, aeropuertos,<br>aerolínea, matrícula"]
+        OM["Open-Meteo Previous Runs<br>pronóstico archivado:<br>viento a 250 hPa y superficie"]
+        IEM["IEM ASOS/METAR<br>observado: techo de nubes,<br>visibilidad"]
     end
 
-    BTS & OM & IEM --> JOIN["JOIN TEMPORAL\npor aeropuerto y ventana UTC"]
-    JOIN --> FE["FEATURE ENGINEERING\nheadwind/tailwind | hora ciclica\ncongestion hub | festivos"]
+    BTS & OM & IEM --> JOIN["Cruce temporal<br>por aeropuerto y hora UTC"]
+    JOIN --> FE["Variables<br>viento de cara · hora cíclica<br>congestión · festivos"]
 
-    FE --> CLF["CLASIFICADOR\nTipo de demora\n(multiclase)"]
-    FE --> REG["REGRESOR\nAirTime\n(minutos en aire)"]
-    CLF -- "prob(demora)" --> REG
+    FE --> CLS["Clasificador<br>tipo de demora"]
+    FE --> REG["Regresor<br>tiempo en el aire"]
+    CLS -- "probabilidades<br>fuera de pliegue" --> REG
 
-    CLF & REG --> OUT["SALIDA JSON\nduracion estimada | tipo demora | confianza"]
+    CLS & REG --> OUT["Salida<br>minutos estimados · tipo de demora · confianza"]
 ```
 
-### Flujo jerarquico
+El clasificador estima la probabilidad de cada tipo de demora. Esas probabilidades entran al regresor como variables adicionales. Para que el regresor no aprenda de probabilidades que ya vieron su propia etiqueta, se generan **fuera de pliegue**: cada fila recibe la probabilidad de un modelo que no la usó para entrenar. El detalle está en [PLAN.md · Flujos](PLAN.md#6-flujos).
+
+---
+
+## Cómo ejecutar
+
+Estado de cada paso a día de hoy, en `main`:
+
+| Símbolo | Significa |
+|---|---|
+| ● | Funciona y está cerrado |
+| ◐ | Funciona, con pendientes anotados en el plan |
+| ○ | Todavía no existe |
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart LR
-    A["Features\ncomunes"] --> B["Clasificador\nmulticlase"]
-    B -- "P(Weather)\nP(NAS)\nP(Carrier)\n..." --> C["Features\nenriquecidas"]
-    A --> C
-    C --> D["Regresor\nAirTime"]
-    D --> E["Prediccion\nminutos en aire"]
+    E["1 · Entorno<br>venv y requirements"]:::partial --> D["2 · Datos<br>download_data.py"]:::partial
+    D --> T["3 · Pruebas<br>unittest"]:::partial
+    T --> P["4 · Preprocesamiento<br>03_preprocessing"]:::pending
+    P --> C["5 · Clasificación<br>04_classification"]:::partial
+    P --> R["6 · Regresión<br>05_regression"]:::pending
+    C -- "probabilidades<br>fuera de pliegue" --> R
+    C --> I["7 · Integración<br>06 y 07"]:::pending
+    R --> I
+
+    classDef done fill:#1f1f1f,color:#fff,stroke:#1f1f1f;
+    classDef partial fill:#fff,stroke:#d9480f,stroke-width:2px;
+    classDef pending fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray:4 3;
 ```
 
-El clasificador predice primero la probabilidad de cada tipo de demora. Esas probabilidades se inyectan como features adicionales al regresor de AirTime, afinando la estimacion cuando hay disrupciones meteorologicas o de trafico aereo.
+Todos los comandos se ejecutan desde la raíz del repositorio.
+
+### 1. Entorno ◐
+
+Requiere Python 3.10 o superior.
+
+```bash
+git clone https://github.com/albertxestrada/ProyectoAprendizajeSupervisado.git
+cd ProyectoAprendizajeSupervisado
+
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Pendiente: `requirements.txt` solo fija cotas mínimas, así que dos instalaciones en fechas distintas pueden dar versiones distintas. Fijar versiones exactas y la versión de Python es la tarea [B5](PLAN.md#b5--entorno-fijado).
+
+### 2. Datos ◐
+
+Los datos crudos no van en git: pesan unos 5 GB. Hoy se descargan desde las fuentes; el proceso es lento.
+
+```bash
+python data/raw/download_data.py --source all
+
+# o una fuente cada vez
+python data/raw/download_data.py --source bts
+python data/raw/download_data.py --source open_meteo
+python data/raw/download_data.py --source iem
+```
+
+Qué deja:
+
+```text
+data/raw/bts/on_time_AAAA_MM.csv        un archivo por mes, de feb-2024 a dic-2025
+data/raw/open_meteo/wind_250hPa_2024.csv
+data/raw/iem/asos_metar_2024.csv
+```
+
+Los dos últimos nombres dicen `2024` pero cubren todo el periodo; corregirlo es parte de [B6](PLAN.md#b6--descarga-que-falla-en-voz-alta).
+
+Para comprobar que los archivos son los mismos que usó el equipo, se compara su huella SHA-256 con las tablas de `data/data_contract.md`:
+
+```bash
+sha256sum data/raw/bts/*.csv data/raw/open_meteo/*.csv data/raw/iem/*.csv
+# macOS: shasum -a 256 ...
+```
+
+Si una huella no coincide, la fuente cambió desde la descarga original. Conviene avisar al equipo antes de seguir.
+
+Pendiente ([B8](PLAN.md#b8--datos-compartidos)): publicar los crudos en una Release de GitHub con un manifiesto, para descargarlos y verificarlos de una vez sin volver a las fuentes:
+
+```bash
+python data/raw/fetch_data.py      # ○ todavía no existe
+```
+
+### 3. Pruebas ◐
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Debería encontrar seis pruebas. Tres avisos mientras se cierran [B2](PLAN.md#b2--importar-sin-syspath) y [B7](PLAN.md#b7--pruebas-separadas):
+
+- `python -m unittest` a secas encuentra cero pruebas, porque falta `tests/__init__.py`.
+- `test_real_data_loaders` necesita los datos del paso 2; sin ellos falla en lugar de saltarse.
+- `test_split_boundaries` comprueba las fechas de 2024; fallará en cuanto `config.py` pase al periodo nuevo.
+
+### 4 a 7. Cuadernos, en orden
+
+| Paso | Cuaderno | Qué hace | Lee | Deja | Responsable | Estado |
+|---|---|---|---|---|---|---|
+| — | `01_eda_bts` | Exploración de vuelos guiada por preguntas | `data/raw/bts/` | `results/figures/` | Camilo | ○ |
+| — | `02_eda_weather` | Exploración del clima y su cobertura | `data/raw/open_meteo/`, `data/raw/iem/` | `results/figures/` | Emilio | ○ |
+| 4 | `03_preprocessing` | Carga, etiquetas, horas UTC, cruce con el clima, variables y partición | `data/raw/` | `data/processed/splits/`, `models/preprocessor.joblib` | Camilo, con Emilio | ○ |
+| 5 | `04_classification` | Baselines, modelos, calibración y probabilidades fuera de pliegue | `data/processed/splits/` | `models/classification/`, `data/processed/oof_probs.parquet` | Alberto | ◐ en su rama, sin ejecutar |
+| 6 | `05_regression` | Tiempo en el aire, primero sin y luego con las probabilidades | `splits/`, `oof_probs.parquet` | `models/regression/` | Dylan | ○ |
+| 7 | `06_hierarchical_pipeline` | Cadena completa y evaluación única sobre test | `models/`, `splits/` | `results/tables/` | Dylan y Emilio | ○ |
+| 7 | `07_error_analysis` | Errores por grupos: ruta, aeropuerto, hora, clase | todo lo anterior | `results/figures/` | Emilio | ○ |
+
+Para abrirlos, con el entorno activado:
+
+```bash
+jupyter notebook notebooks/
+```
+
+Para ejecutarlos de principio a fin sin abrirlos, que es como debería poder reproducirlos el profesor:
+
+```bash
+for nb in notebooks/0*.ipynb; do
+    jupyter nbconvert --to notebook --execute --inplace "$nb"
+done
+```
+
+Hasta que exista `03_preprocessing`, el preprocesamiento no tiene punto de entrada: las funciones están en `src/`, pero nada las encadena todavía.
+
+### Qué queda fuera de git
+
+```text
+data/raw/              crudos; se descargan (paso 2)
+data/processed/        partición y probabilidades; se regeneran (pasos 4 y 5)
+models/*.joblib        modelos entrenados; irán en la Release (B8)
+```
+
+Los patrones de `.gitignore` tienen errores que hoy dejan pasar archivos; arreglarlos es [B1](PLAN.md#b1--gitignore-correcto).
 
 ---
 
 ## Estructura del repositorio
 
-```
-flight-delay-prediction/
-|
-|-- README.md
-|-- requirements.txt
-|-- config.py                        # Constantes centralizadas (semillas, splits, leakage)
-|-- .gitignore
-|
-|-- data/
-|   |-- raw/                         # Datos originales (NO subir al repo, en .gitignore)
-|   |   |-- bts/                     # CSVs mensuales BTS On-Time Performance
-|   |   |-- open_meteo/              # Viento 250 hPa por aeropuerto
-|   |   |-- iem/                     # Observaciones ASOS/METAR
-|   |   +-- download_data.py         # Script para reproducir la descarga
-|   |
-|   |-- processed/                   # Dataset consolidado tras join y limpieza
-|   |   +-- splits/                  # Train/val/test en parquet
-|   |
-|   +-- data_contract.md             # Fuentes, hashes SHA-256, fechas de descarga
-|
-|-- notebooks/
-|   |-- 01_eda_bts.ipynb
-|   |-- 02_eda_weather.ipynb
-|   |-- 03_preprocessing.ipynb
-|   |-- 04_classification.ipynb
-|   |-- 05_regression.ipynb
-|   |-- 06_hierarchical_pipeline.ipynb
-|   +-- 07_error_analysis.ipynb
-|
-|-- src/
-|   |-- __init__.py
-|   |-- data_loading.py              # Stubs con firma + docstring (implementar)
-|   |-- preprocessing.py             # Stubs con firma + docstring (implementar)
-|   |-- feature_engineering.py       # Stubs con firma + docstring (implementar)
-|   |-- evaluation.py                # Stubs con firma + docstring (implementar)
-|   +-- utils.py                     # Helpers listos (set_seed, timer, file_sha256)
-|
-|-- models/
-|   |-- classification/              # .joblib del mejor clasificador
-|   +-- regression/                  # .joblib del mejor regresor
-|
-|-- results/
-|   |-- figures/                     # Graficos exportados para la memoria
-|   |-- tables/                      # CSVs de metricas comparativas
-|   +-- experiment_log.md            # Registro de experimentos
-|
-+-- docs/
-    |-- memoria.pdf
-    +-- defensa.pdf
+Hoy, en `main`:
+
+```text
+ProyectoAprendizajeSupervisado/
+├── README.md                 este archivo
+├── PLAN.md                   plan de acción
+├── config.py                 rutas, semilla, fechas, clases, aeropuertos
+├── requirements.txt
+├── data/
+│   ├── data_contract.md      fuentes y hashes
+│   ├── raw/
+│   │   ├── download_data.py  descarga desde las fuentes
+│   │   ├── bts/  iem/  open_meteo/
+│   └── processed/
+│       └── splits/
+├── notebooks/                vacío en main; el 04 está en la rama de Alberto
+├── src/
+│   ├── data_loading.py       carga de las tres fuentes
+│   ├── preprocessing.py      UTC, etiquetas, cruce con clima, partición
+│   ├── feature_engineering.py
+│   ├── evaluation.py         plantillas por implementar
+│   └── utils.py              semilla, temporizador, sha256
+├── models/
+│   ├── classification/
+│   └── regression/
+├── results/
+│   ├── experiment_log.md
+│   ├── figures/
+│   └── tables/
+├── tests/
+│   └── test_data_feature_engineering.py
+└── docs/                     memoria y defensa, al final
 ```
 
----
-
-## Que esta listo (base) y que falta (por implementar)
-
-### Ya incluido en la base
-
-| Archivo | Estado | Descripcion |
-|---|---|---|
-| `config.py` | **Listo** | RANDOM_STATE=42, rutas, fechas de split, 22 columnas de leakage, 8 clases, 20 Core Hubs |
-| `requirements.txt` | **Listo** | Todas las dependencias |
-| `.gitignore` | **Listo** | Excluye datos, modelos, .venv, IDE |
-| `src/utils.py` | **Listo** | `set_seed()`, `timer()`, `df_summary()`, `file_sha256()`, `ensure_dir()` |
-| `data/data_contract.md` | **Listo** | Documentacion de las 3 fuentes con placeholders para SHA-256 |
-| `data/raw/download_data.py` | **Listo** | Script de descarga (BTS manual + Open-Meteo/IEM automaticos) |
-| `results/experiment_log.md` | **Listo** | Plantilla de tracking |
-
-### Por implementar (stubs con `raise NotImplementedError`)
-
-| Archivo | Funciones | Responsable |
-|---|---|---|
-| `src/data_loading.py` | `load_bts()`, `load_open_meteo()`, `load_iem()` | Juan Camilo |
-| `src/preprocessing.py` | `convert_crs_to_utc()`, `build_classification_label()`, `separate_cancelled_operated()`, `temporal_join_weather()`, `split_temporal()`, `save_splits()` | Juan Camilo |
-| `src/feature_engineering.py` | `compute_bearing()`, `add_flight_bearing()`, `add_headwind_component()`, `add_cyclical_time()`, `add_day_of_week()`, `add_month_cyclical()`, `add_holiday_flag()`, `add_hub_congestion()`, `apply_all_features()` | Juan Camilo |
-| `src/evaluation.py` | `classification_metrics()`, `plot_confusion_matrix()`, `plot_per_class_f1()` | Alberto |
-| `src/evaluation.py` | `regression_metrics()`, `plot_predicted_vs_actual()`, `plot_residuals()` | Dylan |
-| `src/evaluation.py` | `model_comparison_table()`, `save_comparison_table()` | Hector |
-
-> **Cada funcion tiene su firma, docstring y TODO con instrucciones concretas.** Solo hay que reemplazar el `raise NotImplementedError` por la implementacion real.
-
----
-
-## Instrucciones detalladas por integrante
-
-### Juan Camilo Bolanos — Datos & Feature Engineering
-
-**Tu objetivo:** Que el equipo tenga `data/processed/splits/train.parquet`, `val.parquet` y `test.parquet` listos para modelar.
-
-**Que hacer paso a paso:**
-
-1. **Descargar datos** (Semana 1, dia 1-2)
-   - BTS: descarga manual desde https://www.transtats.bts.gov/ (12 CSVs mensuales 2024, ver instrucciones en `data/raw/download_data.py`)
-   - Open-Meteo e IEM: ejecutar `python data/raw/download_data.py --source open_meteo` y `--source iem`
-   - Registrar hashes SHA-256 en `data/data_contract.md` usando `src/utils.file_sha256()`
-
-2. **Implementar `src/data_loading.py`** (Semana 1, dia 2-3)
-   - `load_bts()`: leer CSVs, eliminar columnas de `config.LEAKAGE_COLUMNS`
-   - `load_open_meteo()`: leer CSV, parsear timestamps a UTC
-   - `load_iem()`: leer CSV, convertir "M" → NaN, parsear timestamps
-
-3. **Crear `notebooks/01_eda_bts.ipynb`** (Semana 1, dia 3)
-   - Distribucion de las 8 clases de retraso (graficos)
-   - Verificar el desbalanceo (~76% OnTime)
-   - Vuelos por aeropuerto, por aerolinea, por mes
-   - Distribucion de AirTime y su correlacion con Distance
-
-4. **Crear `notebooks/02_eda_weather.ipynb`** (Semana 1, dia 3-4)
-   - Distribucion del viento a 250 hPa (jet stream)
-   - Ceiling y visibility por aeropuerto
-   - Verificar cobertura temporal de los datos meteorologicos
-
-5. **Implementar `src/preprocessing.py`** (Semana 1, dia 4-5)
-   - `build_classification_label()`: construir las 8 clases **ANTES** de eliminar leakage
-   - `convert_crs_to_utc()`: conversion hora local → UTC por timezone del aeropuerto
-   - `temporal_join_weather()`: `pd.merge_asof` por aeropuerto + ventana de 4h backward
-   - `split_temporal()` y `save_splits()`: split cronologico usando fechas de `config.py`
-
-6. **Implementar `src/feature_engineering.py`** (Semana 1, dia 5-6)
-   - Bearing del vuelo + componentes headwind/tailwind del jet stream
-   - Features ciclicas (hora, dia de semana, mes)
-   - Festivos federales USA 2024 con ventana +/- 1 dia
-   - Congestion del hub (vuelos por aeropuerto/dia)
-
-7. **Crear `notebooks/03_preprocessing.ipynb`** (Semana 1, dia 6-7)
-   - Pipeline completo: carga → etiquetas → join → features → split → guardar
-   - Verificar que no haya leakage
-   - Exportar `data/processed/splits/`
-
-**Entregable clave:** Los 3 parquets de train/val/test que Alberto y Dylan necesitan para empezar a modelar.
-
-**Dependencias:** Nadie depende de ti excepto que Alberto y Dylan necesitan los splits para la Semana 2. Deadline: **viernes 21 Nov**.
-
----
-
-### Alberto Estrada — Clasificacion (1ro en el pipeline jerarquico)
-
-**Tu objetivo:** Encontrar el mejor clasificador multiclase (8 clases de retraso) con Macro F1 >= 0.55 y exportar sus probabilidades para que Dylan las use.
-
-**Que hacer paso a paso:**
-
-1. **Implementar funciones de evaluacion en `src/evaluation.py`** (Semana 1, cuando tengas tiempo)
-   - `classification_metrics()`: accuracy, macro_f1, weighted_f1 usando sklearn
-   - `plot_confusion_matrix()`: heatmap con seaborn, opcion de normalizar
-   - `plot_per_class_f1()`: barras por clase + linea del target 0.55
-
-2. **Crear `notebooks/04_classification.ipynb`** (Semana 2, dia 1-3)
-   - Cargar `data/processed/splits/train.parquet` y `val.parquet`
-   - Separar X e y (y = `delay_label`)
-   - **Baselines:**
-     - Clasificador mayoritario (DummyClassifier)
-     - LogisticRegression con `class_weight='balanced'`
-   - **Modelos a comparar:**
-     - RandomForest (n_estimators=100, class_weight='balanced')
-     - XGBoost (scale_pos_weight para desbalanceo)
-     - LightGBM (is_unbalance=True)
-   - **Estrategias de balanceo a probar:**
-     - `class_weight='balanced'` (en los que lo soporten)
-     - SMOTE (de imbalanced-learn)
-     - Undersampling de la clase mayoritaria
-   - Registrar cada experimento en `results/experiment_log.md`
-
-3. **Optimizar hiperparametros** (Semana 2, dia 3-5)
-   - Usar RandomizedSearchCV con TimeSeriesSplit (o Optuna si da tiempo)
-   - **Solo sobre train**, evaluar sobre val
-   - Nunca tocar test hasta la evaluacion final
-
-4. **Exportar probabilidades del mejor modelo** (Semana 2, dia 5)
-   - `model.predict_proba(X_val)` → guardar como columnas extra
-   - Serializar modelo: `joblib.dump(model, 'models/classification/best_clf.joblib')`
-   - Avisar a Dylan que las probabilidades estan listas
-
-5. **Analisis de errores** (Semana 3, dia 1-2)
-   - Confusion matrix final (normalizada y absoluta)
-   - F1 por clase: donde falla mas? (seguramente las clases Cancel_*)
-   - Errores por ruta, por aeropuerto, por hora del dia
-   - Curvas Precision-Recall por clase
-   - Guardar figuras en `results/figures/`
-
-**Entregable clave:** `models/classification/best_clf.joblib` + las probabilidades como features para Dylan.
-
-**Dependencia:** Necesitas los splits de Juan Camilo. Mientras tanto, puedes implementar las funciones de evaluacion y preparar la estructura del notebook.
-
----
-
-### Dylan Cantillo — Regresion (2do en el pipeline jerarquico)
-
-**Tu objetivo:** Predecir AirTime (minutos en el aire) con MAE <= 15 min, usando las probabilidades del clasificador de Alberto como features adicionales.
-
-**Que hacer paso a paso:**
-
-1. **Implementar funciones de evaluacion en `src/evaluation.py`** (Semana 1, cuando tengas tiempo)
-   - `regression_metrics()`: MAE, RMSE, R², MAPE usando sklearn
-   - `plot_predicted_vs_actual()`: scatter con linea y=x
-   - `plot_residuals()`: histograma + scatter de residuos
-
-2. **Crear `notebooks/05_regression.ipynb`** (Semana 2, dia 1-3)
-   - Cargar splits (solo vuelos operados, no cancelados, porque cancelados no tienen AirTime)
-   - **Baseline natural:**
-     - Regresion lineal Distance → AirTime (r ≈ 0.97)
-     - Este es el piso: todo modelo debe superar esta correlacion obvia
-   - **Modelos a comparar (SIN probabilidades del clasificador primero):**
-     - Ridge/Lasso (baseline regularizado)
-     - RandomForest
-     - XGBoost
-     - LightGBM
-   - Registrar cada experimento en `results/experiment_log.md`
-
-3. **Agregar probabilidades del clasificador como features** (Semana 2, dia 4-5)
-   - Cuando Alberto te de las probabilidades, agregarlas como 8 columnas extra
-   - Comparar MAE con y sin probabilidades
-   - **Esta es la hipotesis central del proyecto:** que saber el tipo de demora mejora la prediccion de AirTime
-
-4. **Optimizar hiperparametros** (Semana 2, dia 5)
-   - RandomizedSearchCV con TimeSeriesSplit
-   - Serializar: `joblib.dump(model, 'models/regression/best_reg.joblib')`
-
-5. **Analisis de errores** (Semana 3, dia 1-2)
-   - Predicted vs Actual scatter plot
-   - Distribucion de residuos
-   - Feature importance (SHAP si da tiempo)
-   - Curvas de aprendizaje: hay sobreajuste?
-   - Errores por rango de distancia, por aeropuerto, por hora
-   - Guardar figuras en `results/figures/`
-
-6. **Probar target alternativo** (Semana 2, opcional)
-   - En vez de predecir AirTime directo, predecir el **residuo**: AirTime - CRSElapsedTime
-   - Comparar MAE de ambos enfoques
-
-**Entregable clave:** `models/regression/best_reg.joblib` + analisis de si las prob. del clasificador realmente mejoran la prediccion.
-
-**Dependencia:** Necesitas los splits de Juan Camilo + las probabilidades de Alberto. Puedes avanzar sin las probabilidades, y agregarlas cuando esten listas.
-
----
-
-### Hector Gonzalez — Integracion & Memoria
-
-**Tu objetivo:** Que todo funcione junto (pipeline jerarquico end-to-end), escribir la memoria, y preparar la defensa.
-
-**Que hacer paso a paso:**
-
-1. **Configurar el repositorio** (Semana 1, dia 1)
-   - Crear repo en GitHub, subir la base
-   - Configurar ramas: `main` (protegida) + ramas `feature/*`
-   - Verificar que todos puedan clonar e instalar dependencias
-
-2. **Implementar funciones de comparacion en `src/evaluation.py`** (Semana 1)
-   - `model_comparison_table()`: generar tabla comparativa de modelos
-   - `save_comparison_table()`: guardar en CSV y Markdown
-
-3. **Crear `notebooks/06_hierarchical_pipeline.ipynb`** (Semana 2, dia 5-7)
-   - Cargar mejor clasificador (de Alberto) y mejor regresor (de Dylan)
-   - Pipeline completo: datos → clasificador → probabilidades → regresor → prediccion final
-   - Evaluar el pipeline end-to-end sobre val y luego sobre **test** (unica vez)
-   - Comparar: pipeline jerarquico vs regresor standalone
-
-4. **Crear `notebooks/07_error_analysis.ipynb`** (Semana 3, dia 1-2)
-   - Analisis conjunto de errores
-   - Donde el clasificador se equivoca, como impacta al regresor?
-   - Propuesta de uso: como se integra en una API real
-
-5. **Redactar la memoria** (Semana 2-3)
-   - Max 16 paginas de contenido
-   - Secciones: Introduccion, Datos, EDA, Metodologia, Resultados, Conclusiones, Limitaciones
-   - Incluir figuras de `results/figures/`
-   - Guardar en `docs/memoria.pdf`
-
-6. **Preparar la defensa** (Semana 3, dia 4-5)
-   - Max 10 diapositivas
-   - Narrativa: problema → datos → enfoque jerarquico → resultados → aprendizajes
-   - Guardar en `docs/defensa.pdf`
-
-7. **Revision cruzada** (Semana 3, dia 5)
-   - Verificar que todo el repo esta limpio
-   - Verificar reproducibilidad: `requirements.txt` + `config.py` + splits
-   - Verificar que `README.md` esta actualizado
-
-**Entregable clave:** `docs/memoria.pdf` + `docs/defensa.pdf` + pipeline jerarquico validado.
-
-**Dependencia:** Necesitas los modelos de Alberto y Dylan para el pipeline jerarquico. Puedes avanzar con la memoria (intro, datos, EDA) mientras tanto.
+La estructura objetivo, con cada archivo nuevo marcado con su tarea y su responsable, está en [PLAN.md · Estructura de carpetas](PLAN.md#8-estructura-de-carpetas).
 
 ---
 
 ## Datos
 
-### Fuentes
+| Fuente | Tipo | Qué aporta |
+|---|---|---|
+| [BTS On-Time Performance](https://www.transtats.bts.gov/) | Primaria | Horarios programados y reales, aeropuertos, aerolínea, causas de demora |
+| [Open-Meteo Previous Runs](https://open-meteo.com/) | Secundaria | Pronóstico archivado tal como se conocía antes del vuelo; viento a 250 hPa |
+| [IEM ASOS/METAR](https://mesonet.agron.iastate.edu/) | Secundaria | Observaciones en el aeropuerto: techo de nubes, visibilidad |
 
-| Fuente | Tipo | Registros | Descripcion |
-|---|---|---|---|
-| [BTS On-Time Performance](https://www.transtats.bts.gov/) | Primaria | ~1.498.108 vuelos | Horarios programados/reales, aeropuertos, aerolinea |
-| [Open-Meteo Previous Runs API](https://open-meteo.com/) | Secundaria | ~177.600 registros | Vientos a 250 hPa (jet stream) |
-| [IEM ASOS/METAR](https://mesonet.agron.iastate.edu/) | Secundaria | ~205.779 obs | Techo de nubes, visibilidad |
+- **Periodo:** febrero de 2024 a diciembre de 2025.
+- **Aeropuertos:** hoy, los 20 hubs de `config.CORE_HUBS`. Si se amplía a todos es una [decisión abierta](PLAN.md#10-decisiones-abiertas).
+- **Recuento de filas:** pendiente de rehacer con el periodo ampliado ([P1](PLAN.md#p1--contrato-de-datos-y-trazabilidad)).
 
-### Pipeline de integracion de datos
-
-```mermaid
-flowchart TD
-    subgraph RAW["Datos crudos"]
-        B["BTS CSVs mensuales\n1.49M vuelos x 47 cols"]
-        O["Open-Meteo JSONs\n177K registros x 26 cols"]
-        I["IEM CSVs\n205K obs x 25 cols"]
-    end
-
-    B --> B1["Eliminar 22 cols leakage"]
-    B1 --> B2["Separar cancelados vs operados"]
-    B2 --> B3["Convertir CRSDepTime\nhora local → UTC"]
-
-    O --> O1["Parsear JSONs"]
-    I --> I1["Convertir cols\nobject → float64\ncentinelas M → NaN"]
-
-    B3 & O1 & I1 --> J["JOIN TEMPORAL\npor aeropuerto + ventana 4h UTC"]
-    J --> FE["Feature Engineering"]
-    FE --> SPLIT["Split cronologico\nTrain | Val | Test"]
-    SPLIT --> OUT["splits/train.parquet\nsplits/val.parquet\nsplits/test.parquet"]
-```
+El flujo completo de preprocesamiento, paso a paso, está en [PLAN.md · Flujos](PLAN.md#6-flujos).
 
 ---
 
 ## Tareas predictivas
 
-### Tarea 1: Clasificacion — Tipo de demora (Alberto)
+### Clasificación: tipo de demora
 
-**Pregunta**: *El vuelo sufrira algun tipo de demora especifica?*
+*¿El vuelo sufrirá algún tipo de demora, y de cuál?*
 
-| Clase | Descripcion | Proporcion aprox. |
-|---|---|---|
-| `OnTime` | Sin retraso significativo (< 15 min) | ~76% |
-| `Delay_Carrier` | Retraso atribuible a la aerolinea | ~9% |
-| `Delay_LateAircraft` | Avion tardio por rotacion | ~8% |
-| `Delay_NAS` | Trafico aereo / sistema nacional | ~4% |
-| `Delay_Weather` | Condiciones meteorologicas | ~1.5% |
-| `Cancel_Carrier` | Cancelacion por aerolinea | <1% |
-| `Cancel_Weather` | Cancelacion por clima | <1% |
-| `Cancel_NAS` | Cancelacion por sistema aereo | <1% |
+| Clase | Descripción |
+|---|---|
+| `OnTime` | Sin retraso significativo (menos de 15 min) |
+| `Delay_Carrier` | Retraso atribuible a la aerolínea |
+| `Delay_LateAircraft` | Avión tardío por rotación |
+| `Delay_NAS` | Tráfico aéreo o sistema nacional |
+| `Delay_Weather` | Condiciones meteorológicas |
+| `Cancel_Carrier` | Cancelación por la aerolínea |
+| `Cancel_Weather` | Cancelación por clima |
+| `Cancel_NAS` | Cancelación por el sistema aéreo |
 
-**Metricas principales**: Macro F1 >= 0.55 | **Modelos**: LogReg, RandomForest, XGBoost, LightGBM
+`OnTime` domina con holgura y las cancelaciones son muy raras; las proporciones se recalculan con el periodo nuevo. Quedarse con 8 clases o agrupar en 6 está abierto en el plan.
 
-### Tarea 2: Regresion — Duracion real del vuelo (Dylan)
+- **Objetivo en `config.py`:** Macro F1 de al menos 0,55.
+- **Modelos:** regresión logística, random forest, XGBoost, LightGBM.
 
-**Pregunta**: *Cuantos minutos reales tomara el vuelo en el aire?*
+### Regresión: tiempo en el aire
 
-**Baseline natural**: Regresion lineal Distance → AirTime (r ≈ 0.97). El valor del ML es capturar variaciones por jet stream (250 hPa, media 57 kt, picos 213 kt), congestion y meteorologia.
+*¿Cuántos minutos pasará el avión en el aire?*
 
-**Metricas principales**: MAE <= 15 min | **Modelos**: Ridge/Lasso, RandomForest, XGBoost, LightGBM
+El piso es una regresión lineal de distancia a tiempo en el aire, con correlación cercana a 0,97. El valor del modelo está en lo que la distancia no explica: viento en altura, congestión y meteorología. Elegir entre tiempo en el aire y retraso de llegada como variable objetivo está abierto en el plan.
+
+- **Objetivo en `config.py`:** error absoluto medio de 15 min como máximo.
+- **Modelos:** Ridge y Lasso, random forest, XGBoost, LightGBM.
 
 ---
 
-## Diseno experimental
+## Diseño experimental
 
-### Separacion temporal (sin fugas)
+### Partición temporal
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 gantt
-    title Split cronologico 2024
-    dateFormat  YYYY-MM
-    axisFormat  %b
+    title Partición cronológica
+    dateFormat YYYY-MM-DD
+    axisFormat %b %Y
 
-    section Dataset
-    TRAIN (60%)         :active, train, 2024-01, 2024-08
-    VALIDATION (20%)    :active, val, 2024-09, 2024-10
-    TEST (20%)          :crit, test, 2024-11, 2024-12
+    section Datos
+    Entrenamiento   :active, train, 2024-02-01, 2025-08-31
+    Validación      :active, val, 2025-09-01, 2025-10-31
+    Test            :crit, test, 2025-11-01, 2025-12-31
 ```
 
-> La separacion es estrictamente cronologica. Ningun dato futuro se usa para predecir el pasado.
-> El **test set solo se usa UNA vez** al final para la evaluacion definitiva.
-
----
-
-## Configuracion del entorno
-
-```bash
-# Clonar el repositorio
-git clone https://github.com/<org>/flight-delay-prediction.git
-cd flight-delay-prediction
-
-# Crear entorno virtual
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-
-# Instalar dependencias
-pip install -r requirements.txt
-```
-
----
-
-## Calendario de trabajo
-
-```mermaid
-gantt
-    title Plan de trabajo (17 Nov - 6 Dic)
-    dateFormat  YYYY-MM-DD
-    axisFormat  %d %b
-
-    section Juan Camilo
-    Descargar datos                :jc1, 2024-11-17, 2d
-    Implementar data_loading       :jc2, after jc1, 2d
-    EDA (notebooks 01-02)          :jc3, after jc2, 2d
-    Preprocessing + features       :jc4, after jc3, 3d
-    Splits listos                  :milestone, after jc4, 0d
-
-    section Alberto
-    Funciones evaluacion clf       :a1, 2024-11-17, 3d
-    Baselines clasificacion        :a2, after jc4, 2d
-    Modelos + balanceo             :a3, after a2, 3d
-    Hiperparametros + exportar     :a4, after a3, 2d
-    Analisis de errores            :a5, after a4, 2d
-
-    section Dylan
-    Funciones evaluacion reg       :d1, 2024-11-17, 3d
-    Baselines regresion            :d2, after jc4, 2d
-    Modelos + jet stream           :d3, after d2, 3d
-    + prob clasificador            :d4, after a4, 2d
-    Analisis de errores            :d5, after d4, 2d
-
-    section Hector
-    Configurar repo                :h1, 2024-11-17, 1d
-    Funciones comparacion          :h2, after h1, 2d
-    Memoria (intro, datos, EDA)    :h3, 2024-11-24, 5d
-    Pipeline jerarquico            :h4, after a4, 3d
-    Memoria (resultados)           :h5, after h4, 3d
-    Defensa                        :h6, after h5, 2d
-    Revision final                 :milestone, 2024-12-05, 0d
-```
+- La partición es estrictamente cronológica: ningún dato futuro predice el pasado.
+- El test se usa **una sola vez**, al final, en `06_hierarchical_pipeline`.
+- `config.py` todavía tiene las fechas de 2024; actualizarlas es [P12](PLAN.md#p12--partición-temporal-con-separación).
 
 ---
 
 ## Convenciones del equipo
 
-### Git workflow
+### Git
 
-- Rama principal: `main` (siempre funcional)
-- Ramas de trabajo: `feature/<nombre-descriptivo>` (ej. `feature/join-temporal`)
-- Merge a `main` via Pull Request con al menos 1 revision
-- Commits descriptivos en espanol
-
-### Prefijos de commit
+- `main` siempre funciona; el trabajo va en ramas `feature/<descripción>`.
+- Se fusiona a `main` por pull request con al menos una revisión.
+- El orden de fusión de las ramas abiertas está en [PLAN.md · Flujos](PLAN.md#6-flujos).
+- Commits descriptivos en español, con prefijo:
 
 | Prefijo | Uso |
 |---|---|
 | `feat:` | Nueva funcionalidad |
-| `fix:` | Correccion de bug |
-| `data:` | Cambios en datos o pipeline |
+| `fix:` | Corrección de un error |
+| `data:` | Cambios en datos o en el preprocesamiento |
 | `model:` | Cambios en modelado |
-| `docs:` | Documentacion |
+| `docs:` | Documentación |
 | `exp:` | Experimento o prueba |
 
-### Codigo
+### Código
 
-- Funciones reutilizables en `src/`, no duplicar logica entre notebooks
-- Docstrings en todas las funciones publicas
-- Imports de constantes desde `config.py`
-- Cada `NotImplementedError` en `src/` tiene un TODO con instrucciones
+- La lógica reutilizable vive en `src/`; los cuadernos la llaman, no la copian.
+- Las constantes se importan de `config.py`, nunca se escriben a mano en un cuaderno.
+- Docstrings en todas las funciones públicas.
+- Los cuadernos se suben ejecutados de principio a fin, con sus salidas.
+- Cada experimento deja una fila en `results/experiment_log.md`.
 
 ---
 
 ## Licencia
 
-Proyecto academico. Datos publicos del BTS, Open-Meteo (CC BY 4.0) e IEM.
+Proyecto académico. Datos públicos del BTS, Open-Meteo (CC BY 4.0) e IEM.
