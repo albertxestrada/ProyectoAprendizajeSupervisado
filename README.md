@@ -63,7 +63,7 @@ Estado de cada paso a día de hoy, en `main`:
 ```mermaid
 %%{init: {'theme':'neutral'}}%%
 flowchart LR
-    E["1 · Entorno<br>venv y requirements"]:::partial --> D["2 · Datos<br>download_data.py"]:::partial
+    E["1 · Entorno<br>uv o pip"]:::done --> D["2 · Datos<br>download_data.py"]:::partial
     D --> T["3 · Pruebas<br>unittest"]:::partial
     T --> P["4 · Preprocesamiento<br>03_preprocessing"]:::pending
     P --> C["5 · Clasificación<br>04_classification"]:::partial
@@ -79,20 +79,49 @@ flowchart LR
 
 Todos los comandos se ejecutan desde la raíz del repositorio.
 
-### 1. Entorno ◐
+### 1. Entorno ●
 
-Requiere Python 3.10 o superior.
+Requiere **Python 3.12**. Las versiones exactas de todas las librerías están fijadas en `uv.lock`; `requirements.txt` se genera desde ese archivo. Con uv o con pip se instala lo mismo, en Windows, macOS y Linux.
 
 ```bash
 git clone https://github.com/albertxestrada/ProyectoAprendizajeSupervisado.git
 cd ProyectoAprendizajeSupervisado
+```
 
-python3 -m venv .venv
+**Con uv.** Si falta Python 3.12, uv lo descarga.
+
+```bash
+uv sync                            # crea .venv/ con las versiones de uv.lock
+```
+
+Después, cada comando de esta guía se lanza con `uv run` delante, por ejemplo `uv run python -m unittest discover -s tests -v`. También se puede activar `.venv` como en pip.
+
+**Con pip.** Python 3.12 tiene que estar instalado.
+
+```bash
+python3.12 -m venv .venv           # Windows: py -3.12 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Pendiente: `requirements.txt` solo fija cotas mínimas, así que dos instalaciones en fechas distintas pueden dar versiones distintas. Fijar versiones exactas y la versión de Python es la tarea [B5](PLAN.md#b5--entorno-fijado).
+Con el entorno activado, los comandos de esta guía se escriben tal cual. En VS Code, el kernel de los cuadernos es el intérprete de `.venv`.
+
+Tres librerías tienen un techo de versión. Se probó ejecutando las pruebas y el cuaderno 04, y el motivo está comentado en `pyproject.toml`:
+
+| Librería | Techo | Qué falla con la versión siguiente |
+|---|---|---|
+| pandas | `<3` | pandas 3 guarda el texto con otro tipo; el código que compara con `object` deja el clima como texto, sin error |
+| scikit-learn | `<1.8` | 1.8 elimina `LogisticRegression(multi_class=...)`, que usa el cuaderno 04 |
+| NumPy | `<2.5` | junto a pandas 2.3 lanza un aviso sobre `timedelta` que pasará a ser error |
+
+**Añadir o cambiar una dependencia.** Se edita `pyproject.toml`, nunca `requirements.txt` a mano, y después se regeneran los otros dos archivos:
+
+```bash
+uv lock
+uv export --locked --format requirements-txt --no-hashes -o requirements.txt
+```
+
+Los tres archivos van en el mismo commit. Quien no tenga uv puede instalarlo solo para esto con `pip install uv`.
 
 ### 2. Datos ◐
 
@@ -193,7 +222,10 @@ ProyectoAprendizajeSupervisado/
 ├── README.md                 este archivo
 ├── PLAN.md                   plan de acción
 ├── config.py                 rutas, semilla, fechas, clases, aeropuertos
-├── requirements.txt
+├── .python-version           3.12
+├── pyproject.toml            dependencias; único archivo que se edita a mano
+├── uv.lock                   versiones exactas, para uv
+├── requirements.txt          las mismas versiones, para pip; se genera desde uv.lock
 ├── data/
 │   ├── data_contract.md      fuentes y hashes
 │   ├── raw/

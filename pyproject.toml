@@ -1,0 +1,32 @@
+# Fuente única de dependencias. uv lee este archivo; pip usa requirements.txt,
+# que se genera desde uv.lock (ver README, "Cómo ejecutar").
+[project]
+name = "proyecto-aprendizaje-supervisado"
+version = "0.1.0"
+description = "Anticipando el caos aéreo mediante machine learning"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Límites superiores validados ejecutando tests y notebooks:
+    "numpy>=2.0,<2.5",          # 2.5 con pandas 2.3: aviso de timedelta que pasará a error
+    "pandas>=2.3,<3",           # pandas 3: el texto deja de ser dtype object
+    "scikit-learn>=1.7,<1.8",   # 1.8 elimina LogisticRegression(multi_class=...)
+    "pyarrow>=14.0",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "xgboost>=2.0",
+    "lightgbm>=4.0",
+    "imbalanced-learn>=0.12",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+    "joblib>=1.3",
+    "tqdm>=4.66",
+    "openmeteo-requests>=1.2",
+    "requests>=2.31",
+    "pytz>=2024.1",
+]
+
+[tool.uv]
+# No se instala como paquete: los notebooks importan src/ y config.py
+# desde la raíz del repositorio.
+package = false
