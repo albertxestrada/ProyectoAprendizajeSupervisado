@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 import sys
 
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config import (
     CLASSIFICATION_LABELS,
@@ -20,7 +21,7 @@ from config import (
     SPLITS_DIR,
 )
 
-
+PREDICTION_HORIZON_H = 4
 # ============================================================================
 # Zonas horarias por aeropuerto (20 Core Hubs FAA)
 # Necesario para convertir CRSDepTime (hora local) a UTC
@@ -59,15 +60,35 @@ def convert_crs_to_utc(df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         DataFrame con nueva columna 'dep_datetime_utc'.
-
-    TODO (Juan Camilo):
-        - CRSDepTime es entero HHMM (ej. 1430 = 14:30, 2400 = medianoche)
-        - Combinar FlightDate + hora/minuto para crear datetime local naive
-        - Usar AIRPORT_TIMEZONES para localizar a la zona del aeropuerto de origen
-        - Convertir a UTC
-        - Manejar 'ambiguous' (cambio de horario) y 'nonexistent'
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    out = df.copy()
+    hhmm = pd.to_numeric(out["CRSDepTime"], errors="coerce")
+    valid = (
+        hhmm.notna()
+        & hhmm.between(0, 2400, inclusive="both")
+        & (hhmm % 100).between(0, 59, inclusive="both")
+    )
+    hhmm = hhmm.fillna(0).astype("int64")
+    hours = hhmm // 100
+    minutes = hhmm % 100
+    next_day = hours == 24
+    hours = hours.where(~next_day, 0)
+
+    local = (pd.to_datetime(out["FlightDate"]).dt.normalize()
+             + pd.to_timedelta(hours, unit="h")
+             + pd.to_timedelta(minutes, unit="m"))
+    local = local + pd.to_timedelta(next_day.astype("int64"), unit="D")
+    local = local.where(valid, pd.NaT)
+    utc = pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")
+    for iata,tz in AIRPORT_TIMEZONES.items():
+        mask = out["Origin"] == iata
+        if mask.any():
+            loc = local[mask].dt.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
+            utc.loc[mask] = loc.dt.tz_convert("UTC")
+    out["dep_datetime_utc"] = utc
+    out["pred_datetime_utc"] = utc - pd.Timedelta(hours = PREDICTION_HORIZON_H)
+    out["prediction_time_utc"] = out["pred_datetime_utc"]
+    return out
 
 
 def build_classification_label(df: pd.DataFrame) -> pd.DataFrame:
@@ -88,13 +109,37 @@ def build_classification_label(df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         DataFrame con nueva columna 'delay_label'.
-
-    TODO (Juan Camilo):
-        - Usar np.select con condiciones en orden de prioridad
-        - Clases: ver config.CLASSIFICATION_LABELS
-        - Verificar que las columnas de demora existen antes de usarlas
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    needed_cols = ["Cancelled", "CancellationCode", "ArrDelay", "CarrierDelay",
+                   "WeatherDelay", "NASDelay", "LateAircraftDelay"]
+    missing = set(needed_cols) - set(df.columns)
+    if missing:
+        raise ValueError(f"Faltan columnas requeridas: {missing}")
+
+    out = df.copy()
+    caused = out[["CarrierDelay", "WeatherDelay", "NASDelay", "LateAircraftDelay"]].fillna(0)
+    dominant = caused.idxmax(axis=1).map({
+        "CarrierDelay": "Delay_Carrier",
+        "WeatherDelay": "Delay_Weather",
+        "NASDelay": "Delay_NAS",
+        "LateAircraftDelay": "Delay_LateAircraft"
+    })
+    dominant = dominant.where(caused.max(axis=1) > 0, "Delay_Carrier")
+
+    cancelled = out["Cancelled"].fillna(0).astype(float)==1
+    cancel_label = out["CancellationCode"].map({
+        "A": "Cancel_Carrier",
+        "B": "Cancel_Weather",
+        "C": "Cancel_NAS"
+    })
+    delayed = out["ArrDelay"].fillna(0) >= 15
+    out["delay_label"] = np.select(
+        [cancelled & cancel_label.notna(), cancelled, delayed],
+        [cancel_label, "OnTime", dominant],
+        default="OnTime"
+    )
+    assert set(out["delay_label"]) <= set(CLASSIFICATION_LABELS)
+    return out
 
 
 def separate_cancelled_operated(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -104,7 +149,9 @@ def separate_cancelled_operated(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
     Returns:
         (df_operated, df_cancelled)
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    cancelled_mask = df["Cancelled"].fillna(0).astype(float)==1
+    operated_mask = ~cancelled_mask & df["AirTime"].notna()
+    return df[operated_mask].copy(), df[cancelled_mask].copy()
 
 
 def temporal_join_weather(
@@ -114,6 +161,8 @@ def temporal_join_weather(
     weather_station_col: str = "station",
     window_hours: int = 4,
     direction: str = "backward",
+    flight_time_col: str = "prediction_time_utc",
+    suffix: str = "",
 ) -> pd.DataFrame:
     """
     Join temporal entre vuelos y datos meteorologicos usando pd.merge_asof.
@@ -128,13 +177,28 @@ def temporal_join_weather(
 
     Returns:
         DataFrame de vuelos enriquecido con columnas meteorologicas.
-
-    TODO (Juan Camilo):
-        - Ordenar ambos DataFrames por sus columnas de tiempo
-        - Usar pd.merge_asof con tolerance y direction
-        - Mergear por aeropuerto (left_by='Origin', right_by=weather_station_col)
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    left = flights.dropna(subset=[flight_time_col]).copy()
+    right = weather.copy()
+
+    left[flight_time_col] = left[flight_time_col].astype("datetime64[ns, UTC]")
+    right[weather_time_col] = right[weather_time_col].astype("datetime64[ns, UTC]")
+    left = left.sort_values(flight_time_col)
+    right = right.sort_values(weather_time_col)
+    if suffix:
+        right = right.rename(columns={c: f"{c}{suffix}" for c in right.columns
+                                      if c not in (weather_time_col, weather_station_col)})
+
+    merged = pd.merge_asof(
+        left, right,
+        left_on=flight_time_col,
+        right_on=weather_time_col,
+        left_by="Origin",
+        right_by=weather_station_col,
+        direction=direction,
+        tolerance=pd.Timedelta(hours=window_hours)
+    )
+    return merged.drop(columns=[weather_time_col], errors="ignore")
 
 
 def split_temporal(
@@ -149,9 +213,15 @@ def split_temporal(
     Returns:
         (train, val, test)
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    d = pd.to_datetime(df[date_col])
+    train = df[d <= pd.Timestamp(TRAIN_END)]
+    val = df[(d >= pd.Timestamp(VAL_START)) & (d <= pd.Timestamp(VAL_END))]
+    test = df[d >= pd.Timestamp(TEST_START)]
+    return train.copy(), val.copy(), test.copy()
 
 
 def save_splits(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame) -> None:
     """Guarda los splits en parquet dentro de data/processed/splits/."""
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    SPLITS_DIR.mkdir(parents=True, exist_ok=True)
+    for name, part in [("train", train), ("val", val), ("test", test)]:
+        part.to_parquet(SPLITS_DIR / f"{name}.parquet", index=False)

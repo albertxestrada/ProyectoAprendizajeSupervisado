@@ -46,12 +46,13 @@ def compute_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float
     """
     Calcula el bearing (rumbo) en grados desde (lat1, lon1) a (lat2, lon2).
     Resultado en [0, 360).
-
-    TODO (Juan Camilo):
-        - Usar la formula esferica del bearing inicial
-        - Convertir a radianes, aplicar arctan2, devolver en grados [0, 360)
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    p1, p2 = np.radians(lat1), np.radians(lat2)
+    dl = np.radians(lon2) - np.radians(lon1)
+    x = np.sin(dl) * np.cos(p2)
+    y = np.cos(p1) * np.sin(p2) - np.sin(p1) * np.cos(p2) * np.cos(dl)
+    bearing = np.arctan2(x, y)
+    return np.degrees(bearing) % 360
 
 
 def add_flight_bearing(df: pd.DataFrame) -> pd.DataFrame:
@@ -62,7 +63,13 @@ def add_flight_bearing(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame con nueva columna 'flight_bearing' (grados).
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    out = df.copy()
+    lat = {k: v[0] for k, v in HUB_COORDS.items()}
+    lon = {k: v[1] for k, v in HUB_COORDS.items()}
+    o_lat, o_lon = out["Origin"].map(lat), out["Origin"].map(lon)
+    d_lat, d_lon = out["Dest"].map(lat), out["Dest"].map(lon)
+    out["flight_bearing"] = compute_bearing(o_lat, o_lon, d_lat, d_lon)
+    return out
 
 
 def add_headwind_component(
@@ -78,14 +85,14 @@ def add_headwind_component(
 
     Returns:
         DataFrame con 'headwind_component' y 'crosswind_component'.
-
-    TODO (Juan Camilo):
-        - Requiere 'flight_bearing' (ejecutar add_flight_bearing antes)
-        - relative_angle = wind_direction - flight_bearing
-        - headwind = wind_speed * cos(relative_angle)
-        - crosswind = wind_speed * sin(relative_angle)
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    if "flight_bearing" not in df.columns:
+        df = add_flight_bearing(df)
+    out = df.copy()
+    rel = np.radians(out[wind_dir_col] - out["flight_bearing"])
+    out["headwind_component"] = -out[wind_speed_col] * np.cos(rel)
+    out["crosswind_component"] = out[wind_speed_col] * np.sin(rel)
+    return out
 
 
 def add_cyclical_time(df: pd.DataFrame, time_col: str = "CRSDepTime") -> pd.DataFrame:
@@ -96,7 +103,12 @@ def add_cyclical_time(df: pd.DataFrame, time_col: str = "CRSDepTime") -> pd.Data
     Returns:
         DataFrame con 'hour_sin', 'hour_cos'.
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    out = df.copy()
+    hhmm = pd.to_numeric(out[time_col], errors="coerce")
+    hour = ((hhmm // 100) % 24) + (hhmm % 100) / 60
+    out["hour_sin"] = np.sin(2 * np.pi * hour / 24)
+    out["hour_cos"] = np.cos(2 * np.pi * hour / 24)
+    return out
 
 
 def add_day_of_week(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.DataFrame:
@@ -106,7 +118,12 @@ def add_day_of_week(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.DataFr
     Returns:
         DataFrame con 'dow_sin', 'dow_cos', 'is_weekend'.
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    out = df.copy()
+    dow = pd.to_datetime(out[date_col]).dt.dayofweek
+    out["dow_sin"] = np.sin(2 * np.pi * dow / 7)
+    out["dow_cos"] = np.cos(2 * np.pi * dow / 7)
+    out["is_weekend"] = (dow >= 5).astype(int)
+    return out
 
 
 def add_month_cyclical(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.DataFrame:
@@ -116,7 +133,11 @@ def add_month_cyclical(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.Dat
     Returns:
         DataFrame con 'month_sin', 'month_cos'.
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    out = df.copy()
+    month = pd.to_datetime(out[date_col]).dt.month - 1
+    out["month_sin"] = np.sin(2 * np.pi * month / 12)
+    out["month_cos"] = np.cos(2 * np.pi * month / 12)
+    return out
 
 
 def add_holiday_flag(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.DataFrame:
@@ -131,7 +152,16 @@ def add_holiday_flag(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.DataF
     Returns:
         DataFrame con 'is_holiday_window'.
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    from pandas.tseries.holiday import USFederalHolidayCalendar
+    out = df.copy()
+    dates = pd.to_datetime(out[date_col]).dt.normalize()
+    holidays = USFederalHolidayCalendar().holidays(
+        start=dates.min() - pd.Timedelta(days=2), end=dates.max() + pd.Timedelta(days=2))
+    window = set()
+    for holiday in holidays:
+        window.update([holiday - pd.Timedelta(days=1), holiday, holiday + pd.Timedelta(days=1)])
+    out["is_holiday_window"] = dates.isin(window).astype(int)
+    return out
 
 
 def add_hub_congestion(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.DataFrame:
@@ -142,7 +172,9 @@ def add_hub_congestion(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.Dat
     Returns:
         DataFrame con 'origin_daily_flights'.
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    out = df.copy()
+    out["origin_daily_flights"] = out.groupby(["Origin", date_col])["Origin"].transform("size")
+    return out
 
 
 def apply_all_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -164,4 +196,24 @@ def apply_all_features(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame enriquecido con todas las features derivadas.
     """
-    raise NotImplementedError("Pendiente: Juan Camilo")
+    out = add_flight_bearing(df)
+    wind_speed_col = next(
+        (col for col in out.columns if col.startswith("wind_speed_250hPa")),
+        None,
+    )
+    wind_direction_col = next(
+        (col for col in out.columns if col.startswith("wind_direction_250hPa")),
+        None,
+    )
+    if wind_speed_col and wind_direction_col:
+        out = add_headwind_component(
+            out,
+            wind_speed_col=wind_speed_col,
+            wind_dir_col=wind_direction_col,
+        )
+    out = add_cyclical_time(out)
+    out = add_day_of_week(out)
+    out = add_month_cyclical(out)
+    out = add_holiday_flag(out)
+    out = add_hub_congestion(out)
+    return out

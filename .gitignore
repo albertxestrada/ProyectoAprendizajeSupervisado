@@ -1,0 +1,37 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+_pycache_/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Datos descargados y procesados
+*.csv
+# Modelos entrenados
+models/*/.joblib
+models/*/.pkl
+models/*/.pickle
+models/*/.model
+
+# Resultados generados
+results/figures/*
+!results/figures/.gitkeep
+results/tables/*
+!results/tables/.gitkeep
+
+# Configuracion local y secretos
+.env
+.env.*
+!.env.example
+
+# IDE y sistema operativo
+.idea/
+.vscode/
+.DS_Store
