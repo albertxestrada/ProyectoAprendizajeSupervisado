@@ -90,7 +90,7 @@ def add_headwind_component(
         df = add_flight_bearing(df)
     out = df.copy()
     rel = np.radians(out[wind_dir_col] - out["flight_bearing"])
-    out["headwind_component"] = -out[wind_speed_col] * np.cos(rel)
+    out["headwind_component"] = out[wind_speed_col] * np.cos(rel)
     out["crosswind_component"] = out[wind_speed_col] * np.sin(rel)
     return out
 
@@ -134,7 +134,7 @@ def add_month_cyclical(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.Dat
         DataFrame con 'month_sin', 'month_cos'.
     """
     out = df.copy()
-    month = pd.to_datetime(out[date_col]).dt.month - 1
+    month = pd.to_datetime(out[date_col]).dt.month
     out["month_sin"] = np.sin(2 * np.pi * month / 12)
     out["month_cos"] = np.cos(2 * np.pi * month / 12)
     return out
@@ -177,6 +177,176 @@ def add_hub_congestion(df: pd.DataFrame, date_col: str = "FlightDate") -> pd.Dat
     return out
 
 
+def add_scheduled_congestion(
+    df: pd.DataFrame,
+    departure_col: str = "dep_datetime_utc",
+    arrival_col: str = "arr_datetime_utc",
+) -> pd.DataFrame:
+    """
+    Cuenta salidas y llegadas programadas en la misma hora UTC del vuelo.
+
+    Los conteos se realizan sobre todas las filas disponibles, incluidas las
+    canceladas, porque Cancelled no debe usarse para filtrar features P7.
+    """
+    required = {"Origin", "Dest", departure_col, arrival_col}
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError("Faltan columnas requeridas: " + ", ".join(missing))
+
+    out = df.copy()
+    departures = pd.to_datetime(out[departure_col], utc=True, errors="coerce")
+    arrivals = pd.to_datetime(out[arrival_col], utc=True, errors="coerce")
+
+    dep_hour = departures.dt.floor("h")
+    arr_hour = arrivals.dt.floor("h")
+
+    dep_lookup = pd.DataFrame({
+        "airport": out["Origin"],
+        "hour": dep_hour,
+    }).value_counts()
+    arr_lookup = pd.DataFrame({
+        "airport": out["Dest"],
+        "hour": arr_hour,
+    }).value_counts()
+
+    out["origin_scheduled_departures_hour"] = [
+        dep_lookup.get((airport, hour), 0)
+        for airport, hour in zip(out["Origin"], dep_hour)
+    ]
+    out["dest_scheduled_arrivals_hour"] = [
+        arr_lookup.get((airport, hour), 0)
+        for airport, hour in zip(out["Dest"], arr_hour)
+    ]
+
+    dest_dep_lookup = pd.DataFrame({
+        "airport": out["Dest"],
+        "hour": dep_hour,
+    }).value_counts()
+    origin_arr_lookup = pd.DataFrame({
+        "airport": out["Origin"],
+        "hour": arr_hour,
+    }).value_counts()
+
+    out["dest_scheduled_departures_hour"] = [
+        dest_dep_lookup.get((airport, hour), 0)
+        for airport, hour in zip(out["Dest"], dep_hour)
+    ]
+    out["origin_scheduled_arrivals_hour"] = [
+        origin_arr_lookup.get((airport, hour), 0)
+        for airport, hour in zip(out["Origin"], arr_hour)
+    ]
+
+    out["scheduled_departures_hour"] = out[
+        "origin_scheduled_departures_hour"
+    ]
+    out["scheduled_arrivals_hour"] = out[
+        "dest_scheduled_arrivals_hour"
+    ]
+    out["origin_hour_congestion"] = (
+        out["origin_scheduled_departures_hour"]
+        + out["origin_scheduled_arrivals_hour"]
+    )
+    out["dest_hour_congestion"] = (
+        out["dest_scheduled_departures_hour"]
+        + out["dest_scheduled_arrivals_hour"]
+    )
+    return out
+
+
+def recent_delays(
+    df: pd.DataFrame,
+    window_hours: float = 2.0,
+    cutoff_col: str = "T_corte_utc",
+    scheduled_arrival_col: str = "arr_datetime_utc",
+) -> pd.DataFrame:
+    """
+    Agrega retrasos recientes de vuelos de la misma aerolinea que llegan
+    al aeropuerto de origen dentro de las 2 horas anteriores al corte.
+
+    Para cancelados, usa el retraso acumulado hasta el corte:
+    max(corte - llegada programada, 0). Para vuelos operados, usa ArrDelay.
+    Solo procesa llegadas programadas a partir del corte menos la ventana.
+    """
+    required = {
+        "Reporting_Airline",
+        "Origin",
+        cutoff_col,
+        scheduled_arrival_col,
+        "ArrDelay",
+        "Cancelled",
+    }
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError("Faltan columnas requeridas: " + ", ".join(missing))
+
+    out = df.copy()
+    out["_recent_row_id"] = range(len(out))
+    out["_cutoff"] = pd.to_datetime(out[cutoff_col], utc=True, errors="coerce")
+    out["_arrival"] = pd.to_datetime(
+        out[scheduled_arrival_col], utc=True, errors="coerce"
+    )
+
+    medians = np.zeros(len(out), dtype="float64")
+    rates = np.zeros(len(out), dtype="float64")
+    counts = np.zeros(len(out), dtype="int64")
+
+    window_ns = int(pd.Timedelta(hours=window_hours).value)
+    for _, group in out.groupby(["Reporting_Airline", "Origin"], sort=False):
+        valid = group["_arrival"].notna() & group["_cutoff"].notna()
+        group = group.loc[valid]
+        if group.empty:
+            continue
+
+        arrival_ns = (
+            group["_arrival"]
+            .to_numpy(dtype="datetime64[ns]")
+            .astype("int64")
+        )
+        order = np.argsort(arrival_ns)
+        sorted_arrivals = arrival_ns[order]
+        sorted_rows = group.iloc[order]
+
+        for _, row in group.iterrows():
+            cutoff = pd.Timestamp(row["_cutoff"])
+            position = int(row["_recent_row_id"])
+            if pd.isna(cutoff):
+                continue
+
+            cutoff_ns = int(pd.Timestamp(cutoff).to_datetime64().astype("datetime64[ns]").astype("int64"))
+            start = np.searchsorted(sorted_arrivals, cutoff_ns - window_ns, side="left")
+            end = np.searchsorted(sorted_arrivals, cutoff_ns, side="left")
+            if start >= end:
+                continue
+
+            candidates = sorted_rows.iloc[start:end].copy()
+            candidates = candidates[
+                candidates["_recent_row_id"] != row["_recent_row_id"]
+            ]
+            if candidates.empty:
+                continue
+
+            cancelled = candidates["Cancelled"].fillna(0).astype(float).eq(1)
+            delays = pd.to_numeric(candidates["ArrDelay"], errors="coerce").copy()
+            accumulated = (
+                cutoff - candidates["_arrival"]
+            ).dt.total_seconds() / 60.0
+            delays = delays.where(~cancelled, accumulated)
+            delays = delays.dropna()
+
+            counts[position] = len(delays)
+            if len(delays):
+                medians[position] = float(delays.median())
+                rates[position] = float(delays.ge(15).mean())
+
+    out["recent_delay_median"] = medians
+    out["recent_delay_rate"] = rates
+    out["recent_flight_count"] = counts
+    return out.drop(
+        columns=["_recent_row_id", "_cutoff", "_arrival"],
+        errors="ignore",
+    )
+
+
 def apply_all_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Aplica toda la ingenieria de caracteristicas en orden.
@@ -197,23 +367,13 @@ def apply_all_features(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame enriquecido con todas las features derivadas.
     """
     out = add_flight_bearing(df)
-    wind_speed_col = next(
-        (col for col in out.columns if col.startswith("wind_speed_250hPa")),
-        None,
-    )
-    wind_direction_col = next(
-        (col for col in out.columns if col.startswith("wind_direction_250hPa")),
-        None,
-    )
-    if wind_speed_col and wind_direction_col:
-        out = add_headwind_component(
-            out,
-            wind_speed_col=wind_speed_col,
-            wind_dir_col=wind_direction_col,
-        )
+    if {"wind_speed_250hPa", "wind_direction_250hPa"} <= set(out.columns):
+        out = add_headwind_component(out)
     out = add_cyclical_time(out)
     out = add_day_of_week(out)
     out = add_month_cyclical(out)
     out = add_holiday_flag(out)
     out = add_hub_congestion(out)
+    if {"dep_datetime_utc", "arr_datetime_utc"} <= set(out.columns):
+        out = add_scheduled_congestion(out)
     return out

@@ -34,9 +34,83 @@ VAL_END = "2024-10-31"        # Validation: Sep-Oct 2024
 TEST_START = "2024-11-01"     # Test: Nov-Dic 2024
 
 # =============================================================================
-# Columnas excluidas por data leakage (informacion post-vuelo)
-# Identificadas en la entrega intermedia
+# Lista blanca de variables disponibles antes de T-4 h
+# La lista solo contiene identificadores y datos conocidos al corte.
+# Las etiquetas y resultados operativos nunca deben pasar a FEATURES_ALLOWED.
 # =============================================================================
+FEATURES_ALLOWED = {
+    # Identidad temporal y aerolinea
+    "Year",
+    "Quarter",
+    "Month",
+    "DayofMonth",
+    "DayOfWeek",
+    "FlightDate",
+    "Reporting_Airline",
+    "DOT_ID_Reporting_Airline",
+    "IATA_CODE_Reporting_Airline",
+    "Flight_Number_Reporting_Airline",
+    # Ruta y programacion
+    "OriginAirportID",
+    "Origin",
+    "OriginCityName",
+    "OriginState",
+    "DestAirportID",
+    "Dest",
+    "DestCityName",
+    "DestState",
+    "CRSDepTime",
+    "CRSArrTime",
+    "CRSElapsedTime",
+    "DepTimeBlk",
+    "ArrTimeBlk",
+    "Distance",
+    "DistanceGroup",
+    "Flights",
+    # Horas normalizadas
+    "dep_datetime_utc",
+    "arr_datetime_utc",
+    "prediction_time_utc",
+    "pred_datetime_utc",
+    "T_corte_utc",
+    # Clima disponible al corte
+    "timestamp_utc",
+    "time",
+    "station",
+    "wind_speed_250hPa",
+    "wind_direction_250hPa",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "skyc1",
+    "vsby",
+    # Features derivadas
+    "flight_bearing",
+    "headwind_component",
+    "crosswind_component",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "is_weekend",
+    "month_sin",
+    "month_cos",
+    "is_holiday_window",
+    "origin_daily_flights",
+    "origin_scheduled_departures_hour",
+    "origin_scheduled_arrivals_hour",
+    "dest_scheduled_departures_hour",
+    "dest_scheduled_arrivals_hour",
+    "scheduled_departures_hour",
+    "scheduled_arrivals_hour",
+    "origin_hour_congestion",
+    "dest_hour_congestion",
+    "recent_delay_median",
+    "recent_delay_rate",
+    "recent_flight_count",
+}
+
+# Compatibilidad temporal durante P2. El nuevo pipeline debe usar
+# FEATURES_ALLOWED; LEAKAGE_COLUMNS no debe ampliarse ni usarse para modelado.
 LEAKAGE_COLUMNS = [
     "DepTime", "DepDelay", "DepDelayMinutes", "DepDel15",
     "DepartureDelayGroups", "TaxiOut", "WheelsOff",
@@ -45,12 +119,13 @@ LEAKAGE_COLUMNS = [
     "ActualElapsedTime", "Diverted", "DivAirportLandings",
     "CarrierDelay", "WeatherDelay", "NASDelay",
     "SecurityDelay", "LateAircraftDelay",
+    "Cancelled", "CancellationCode", "Tail_Number",
 ]
 
 # =============================================================================
 # Target de regresion
 # =============================================================================
-REGRESSION_TARGET = "AirTime"
+REGRESSION_TARGET = "ArrDelay"
 
 # =============================================================================
 # Etiquetas de clasificacion multiclase
@@ -61,10 +136,8 @@ CLASSIFICATION_LABELS = [
     "Delay_Carrier",
     "Delay_Weather",
     "Delay_NAS",
+    "Delay_Security",
     "Delay_LateAircraft",
-    "Cancel_Carrier",
-    "Cancel_Weather",
-    "Cancel_NAS",
 ]
 
 # =============================================================================

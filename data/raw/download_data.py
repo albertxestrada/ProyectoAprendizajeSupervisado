@@ -14,13 +14,13 @@ documenta los pasos y descarga automaticamente Open-Meteo e IEM.
 import argparse
 import sys
 from pathlib import Path
-from datetime import date, timedelta
+from config import CORE_HUBS, PRESSURE_LEVEL_HPA, DATA_START, DATA_END
 
 # Agregar raiz del proyecto al path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
-from config import CORE_HUBS, PRESSURE_LEVEL_HPA, DATA_START, DATA_END
+from config import CORE_HUBS, PRESSURE_LEVEL_HPA
 
 
 # ============================================================================
@@ -152,7 +152,7 @@ def download_open_meteo():
                 "latitude": lat,
                 "longitude": lon,
                 "start_date": DATA_START,
-                "end_date": DATA_END,
+                "end_date": "2026-01-01",
                 "hourly": [
                     f"wind_speed_{PRESSURE_LEVEL_HPA}hPa",
                     f"wind_direction_{PRESSURE_LEVEL_HPA}hPa",
@@ -225,7 +225,6 @@ def download_iem():
 
     all_data = []
     icao_stations = list(IATA_TO_ICAO.values())
-    end_exclusive = date.fromisoformat(DATA_END) + timedelta(days=1)
 
     for iata, icao in IATA_TO_ICAO.items():
         print(f"  Descargando {iata} ({icao})...")
@@ -233,10 +232,8 @@ def download_iem():
         params = {
             "station": icao,
             "data": ["skyc1", "vsby"],
-            "year1": int(DATA_START[:4]), "month1": int(DATA_START[5:7]),
-            "day1": int(DATA_START[8:10]),
-            "year2": end_exclusive.year, "month2": end_exclusive.month,
-            "day2": end_exclusive.day,
+            "year1": 2024, "month1": 1, "day1": 1,
+            "year2": 2026, "month2": 1, "day2": 1,
             "tz": "UTC",
             "format": "comma",
             "latlon": "no",

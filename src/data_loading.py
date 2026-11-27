@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from config import RAW_DIR, LEAKAGE_COLUMNS
+from config import FEATURES_ALLOWED, RAW_DIR
 
 def _read_all(subdir: str) -> pd.DataFrame:
     """
@@ -23,7 +23,20 @@ def _read_all(subdir: str) -> pd.DataFrame:
     return pd.concat((pd.read_csv(f, low_memory=False) for f in files), ignore_index=True)
 
 
-def load_bts(months: list[int] | None = None, drop_leakage: bool = False) -> pd.DataFrame:
+def validate_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Comprueba que todas las columnas de X pertenecen a FEATURES_ALLOWED."""
+    unexpected = sorted(set(df.columns) - FEATURES_ALLOWED)
+    if unexpected:
+        raise ValueError(
+            "Columnas fuera de FEATURES_ALLOWED: " + ", ".join(unexpected)
+        )
+    return df
+
+
+def load_bts(
+    months: list[int] | None = None,
+    drop_leakage: bool = False,
+) -> pd.DataFrame:
     """
     Carga los CSVs mensuales de BTS On-Time Performance.
 
@@ -43,7 +56,8 @@ def load_bts(months: list[int] | None = None, drop_leakage: bool = False) -> pd.
     if months is not None:
         df = df[df["FlightDate"].dt.month.isin(months)]
     if drop_leakage:
-        df = df.drop(columns=[c for c in LEAKAGE_COLUMNS if c in df.columns])
+        df = df[[c for c in FEATURES_ALLOWED if c in df.columns]]
+        validate_features(df)
     return df.reset_index(drop=True)
 
 
@@ -62,18 +76,12 @@ def load_open_meteo() -> pd.DataFrame:
     """
     df = _read_all("open_meteo")
     df = df.rename(columns={
-        "time": "timestamp_utc",
-        "timestamp": "timestamp_utc",
-        "station": "airport",
+        "timestamp_utc": "time",
+        "airport": "station",
     })
-    if "timestamp_utc" not in df.columns:
-        raise ValueError("Open-Meteo no contiene una columna de tiempo reconocible")
-    if "airport" not in df.columns:
-        raise ValueError("Open-Meteo no contiene una columna de aeropuerto reconocible")
-    df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True, errors="coerce")
-    df = df.dropna(subset=["timestamp_utc"])
-    df["station"] = df["airport"]
-    return df.sort_values(["airport", "timestamp_utc"]).reset_index(drop=True)
+    df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
+    df = df.dropna(subset=["time"])
+    return df.sort_values(["station", "time"]).reset_index(drop=True)
 
 
 def load_iem() -> pd.DataFrame:
@@ -91,22 +99,19 @@ def load_iem() -> pd.DataFrame:
         - Parsear columna 'valid' a datetime UTC
     """
     df = _read_all("iem")
-    df = df.rename(columns={
-        "valid": "time",
-        "station": "station_icao",
-        "airport_iata": "station",
-    })
+    df = df.rename(columns={"valid": "time"})
     df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
     df = df.dropna(subset=["time"])
 
+    skip = {"time", "station", "station_icao", "airport_iata"}
     for col in df.columns:
-        if col in {"time", "station", "station_icao"}:
+        if col in skip or df[col].dtype != "object":
             continue
-        if pd.api.types.is_object_dtype(df[col].dtype) or pd.api.types.is_string_dtype(df[col].dtype):
-            cleaned = df[col].replace({"M": pd.NA, "T": pd.NA})
-            numeric = pd.to_numeric(cleaned, errors="coerce")
-            if cleaned.notna().sum() > 0 and numeric.notna().sum() >= 0.9 * cleaned.notna().sum():
-                df[col] = numeric.astype("float64")
-            else:
-                df[col] = cleaned
+        cleaned = df[col].replace({"M": pd.NA, "T": pd.NA})
+        numeric = pd.to_numeric(cleaned, errors="coerce")
+
+        if cleaned.notna().sum() and numeric.notna().sum() >= 0.9 * cleaned.notna().sum():
+            df[col] = numeric.astype("float64")
+        else:
+            df[col] = cleaned
     return df.sort_values(["station", "time"]).reset_index(drop=True)

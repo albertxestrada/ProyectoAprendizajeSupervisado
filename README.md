@@ -117,7 +117,7 @@ flight-delay-prediction/
 | `requirements.txt` | **Listo** | Todas las dependencias |
 | `.gitignore` | **Listo** | Excluye datos, modelos, .venv, IDE |
 | `src/utils.py` | **Listo** | `set_seed()`, `timer()`, `df_summary()`, `file_sha256()`, `ensure_dir()` |
-| `data/data_contract.md` | **Listo** | Documentacion de las 3 fuentes con placeholders para SHA-256 |
+| `data/data_contract.md` | **P1 cerrado** | Contrato de las 3 fuentes, T−4 h, periodos reales y trazabilidad |
 | `data/raw/download_data.py` | **Listo** | Script de descarga (BTS manual + Open-Meteo/IEM automaticos) |
 | `results/experiment_log.md` | **Listo** | Plantilla de tracking |
 
@@ -227,7 +227,7 @@ flight-delay-prediction/
 
 5. **Analisis de errores** (Semana 3, dia 1-2)
    - Confusion matrix final (normalizada y absoluta)
-   - F1 por clase: donde falla mas? (seguramente las clases Cancel_*)
+   - F1 por clase: comparar errores entre las seis clases
    - Errores por ruta, por aeropuerto, por hora del dia
    - Curvas Precision-Recall por clase
    - Guardar figuras en `results/figures/`

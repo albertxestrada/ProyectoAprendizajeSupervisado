@@ -42,6 +42,18 @@
 4. El **test set** (nov-dic 2024) se usa SOLO para la evaluacion final
 5. Guardar figuras en `results/figures/` y tablas en `results/tables/`
 
+## Trazabilidad de preprocesamiento
+
+| # | Fecha | Fase | Cambio | Evidencia |
+|---|---|---|---|---|
+| P1 | 2026-11-27 | Contrato y trazabilidad | Contrato actualizado, periodo real documentado y Open-Meteo corregido como pronóstico archivado | `data/data_contract.md`; `data/manifest.csv`; 26 hashes y tamaños verificados |
+| P2 | 2026-11-27 | Lista blanca de variables | Se añadió `FEATURES_ALLOWED` y `validate_features()`; las variables operativas y objetivos quedan fuera de `X` | `config.py`; `src/data_loading.py`; `tests/test_features.py` |
+| P3 | 2026-11-27 | Carga y transformación | Corregidas UTC 2400, etiqueta >=15, límites temporales, carga meteorológica/IEM y bearing | `src/data_loading.py`; `src/preprocessing.py`; `src/feature_engineering.py`; `tests/test_p3_preprocessing.py` |
+| P4 | 2026-11-27 | Horas UTC | Conversión por zona IANA de origen y destino, T_corte UTC y cuarentena de aeropuertos sin zona | `src/preprocessing.py`; `tests/test_p4_timezone.py` |
+| P5 | 2026-11-27 | Etiquetas | ArrDelay >=15, causa dominante con desempate fijo, cuarentena de cancelados y causas ausentes, regresión con ArrDelay | `config.py`; `src/preprocessing.py`; pruebas P3/P5 |
+| P6 | 2026-11-27 | Ventana de retrasos recientes | Mediana, tasa ≥15 y conteo por aerolínea/aeropuerto en 2 h antes del corte; cancelados con retraso acumulado | `src/feature_engineering.py`; `tests/test_p6_recent_delays.py` |
+| P7 | 2026-11-27 | Congestión programada | Conteos UTC por hora de salidas y llegadas programadas en origen/destino, incluyendo cancelados | `src/feature_engineering.py`; `config.py`; `tests/test_p7_scheduled_congestion.py` |
+
 ---
 
-*Ultima actualizacion: PENDIENTE*
+*Última actualización P1: 2026-11-27*
