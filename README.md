@@ -7,7 +7,8 @@
 | Documento | Para qué sirve |
 |---|---|
 | `README.md` | Qué es el sistema y cómo se ejecuta |
-| [`PLAN.md`](PLAN.md) | Quién hace qué, flujos, estado actual y tabla de acción |
+| [`docs/PLAN.md`](docs/PLAN.md) | Qué hay que hacer, quién lo hace, flujos y decisiones |
+| [`docs/ESTADO.md`](docs/ESTADO.md) | Qué está hecho y qué falta, tarea por tarea |
 | [`data/data_contract.md`](data/data_contract.md) | Fuentes, periodo, columnas y hashes de los datos crudos |
 
 ---
@@ -21,7 +22,7 @@
 | Dylan Cantillo Arrieta | Regresión (segundo en la cadena) | Tiempo en el aire, con y sin las probabilidades del clasificador |
 | Hector Emilio Gonzalez Gonzalez | Integración, memoria y apoyo en preprocesamiento | Contrato de datos, clima, calidad y datos compartidos; flujo jerárquico, memoria y defensa |
 
-El reparto tarea por tarea está en [PLAN.md · Quién hace qué](PLAN.md#4-quién-hace-qué) y en la [tabla de acción](PLAN.md#7-tabla-de-acción).
+El reparto tarea por tarea está en [PLAN.md · Quién hace qué](docs/PLAN.md#4-quién-hace-qué) y en la [tabla de acción](docs/PLAN.md#7-tabla-de-acción). Qué está hecho y qué falta, en [ESTADO.md](docs/ESTADO.md).
 
 ---
 
@@ -46,7 +47,7 @@ flowchart TD
     CLS & REG --> OUT["Salida<br>minutos estimados · tipo de demora · confianza"]
 ```
 
-El clasificador estima la probabilidad de cada tipo de demora. Esas probabilidades entran al regresor como variables adicionales. Para que el regresor no aprenda de probabilidades que ya vieron su propia etiqueta, se generan **fuera de pliegue**: cada fila recibe la probabilidad de un modelo que no la usó para entrenar. El detalle está en [PLAN.md · Flujos](PLAN.md#6-flujos).
+El clasificador estima la probabilidad de cada tipo de demora. Esas probabilidades entran al regresor como variables adicionales. Para que el regresor no aprenda de probabilidades que ya vieron su propia etiqueta, se generan **fuera de pliegue**: cada fila recibe la probabilidad de un modelo que no la usó para entrenar. El detalle está en [PLAN.md · Flujos](docs/PLAN.md#6-flujos).
 
 ---
 
@@ -144,7 +145,7 @@ data/raw/open_meteo/wind_250hPa_2024.csv
 data/raw/iem/asos_metar_2024.csv
 ```
 
-Los dos últimos nombres dicen `2024` pero cubren todo el periodo; corregirlo es parte de [B6](PLAN.md#b6--descarga-que-falla-en-voz-alta).
+Los dos últimos nombres dicen `2024` pero cubren todo el periodo; corregirlo es parte de [B6](docs/PLAN.md#b6--descarga-que-falla-en-voz-alta).
 
 Para comprobar que los archivos son los mismos que usó el equipo, se compara su huella SHA-256 con las tablas de `data/data_contract.md`:
 
@@ -155,7 +156,7 @@ sha256sum data/raw/bts/*.csv data/raw/open_meteo/*.csv data/raw/iem/*.csv
 
 Si una huella no coincide, la fuente cambió desde la descarga original. Conviene avisar al equipo antes de seguir.
 
-Pendiente ([B8](PLAN.md#b8--datos-compartidos)): publicar los crudos en una Release de GitHub con un manifiesto, para descargarlos y verificarlos de una vez sin volver a las fuentes:
+Pendiente ([B8](docs/PLAN.md#b8--datos-compartidos)): publicar los crudos en una Release de GitHub con un manifiesto, para descargarlos y verificarlos de una vez sin volver a las fuentes:
 
 ```bash
 python data/raw/fetch_data.py      # ○ todavía no existe
@@ -167,7 +168,7 @@ python data/raw/fetch_data.py      # ○ todavía no existe
 python -m unittest discover -s tests -v
 ```
 
-Debería encontrar seis pruebas. Tres avisos mientras se cierran [B2](PLAN.md#b2--importar-sin-syspath) y [B7](PLAN.md#b7--pruebas-separadas):
+Debería encontrar seis pruebas. Tres avisos mientras se cierran [B2](docs/PLAN.md#b2--importar-sin-syspath) y [B7](docs/PLAN.md#b7--pruebas-separadas):
 
 - `python -m unittest` a secas encuentra cero pruebas, porque falta `tests/__init__.py`.
 - `test_real_data_loaders` necesita los datos del paso 2; sin ellos falla en lugar de saltarse.
@@ -209,7 +210,7 @@ data/processed/        partición y probabilidades; se regeneran (pasos 4 y 5)
 models/*.joblib        modelos entrenados; irán en la Release (B8)
 ```
 
-Los patrones de `.gitignore` tienen errores que hoy dejan pasar archivos; arreglarlos es [B1](PLAN.md#b1--gitignore-correcto).
+Los patrones de `.gitignore` tienen errores que hoy dejan pasar archivos; arreglarlos es [B1](docs/PLAN.md#b1--gitignore-correcto).
 
 ---
 
@@ -220,7 +221,6 @@ Hoy, en `main`:
 ```text
 ProyectoAprendizajeSupervisado/
 ├── README.md                 este archivo
-├── PLAN.md                   plan de acción
 ├── config.py                 rutas, semilla, fechas, clases, aeropuertos
 ├── .python-version           3.12
 ├── pyproject.toml            dependencias; único archivo que se edita a mano
@@ -249,10 +249,12 @@ ProyectoAprendizajeSupervisado/
 │   └── tables/
 ├── tests/
 │   └── test_data_feature_engineering.py
-└── docs/                     memoria y defensa, al final
+└── docs/                     plan y estado; al final, memoria y defensa
+    ├── PLAN.md               plan de acción
+    └── ESTADO.md             qué está hecho y qué falta
 ```
 
-La estructura objetivo, con cada archivo nuevo marcado con su tarea y su responsable, está en [PLAN.md · Estructura de carpetas](PLAN.md#8-estructura-de-carpetas).
+La estructura objetivo, con cada archivo nuevo marcado con su tarea y su responsable, está en [PLAN.md · Estructura de carpetas](docs/PLAN.md#8-estructura-de-carpetas).
 
 ---
 
@@ -265,10 +267,10 @@ La estructura objetivo, con cada archivo nuevo marcado con su tarea y su respons
 | [IEM ASOS/METAR](https://mesonet.agron.iastate.edu/) | Secundaria | Observaciones en el aeropuerto: techo de nubes, visibilidad |
 
 - **Periodo:** febrero de 2024 a diciembre de 2025.
-- **Aeropuertos:** hoy, los 20 hubs de `config.CORE_HUBS`. Si se amplía a todos es una [decisión abierta](PLAN.md#10-decisiones-abiertas).
-- **Recuento de filas:** pendiente de rehacer con el periodo ampliado ([P1](PLAN.md#p1--contrato-de-datos-y-trazabilidad)).
+- **Aeropuertos:** hoy, los 20 hubs de `config.CORE_HUBS`. Si se amplía a todos es una [decisión abierta](docs/PLAN.md#10-decisiones-abiertas).
+- **Recuento de filas:** pendiente de rehacer con el periodo ampliado ([P1](docs/PLAN.md#p1--contrato-de-datos-y-trazabilidad)).
 
-El flujo completo de preprocesamiento, paso a paso, está en [PLAN.md · Flujos](PLAN.md#6-flujos).
+El flujo completo de preprocesamiento, paso a paso, está en [PLAN.md · Flujos](docs/PLAN.md#6-flujos).
 
 ---
 
@@ -324,7 +326,7 @@ gantt
 
 - La partición es estrictamente cronológica: ningún dato futuro predice el pasado.
 - El test se usa **una sola vez**, al final, en `06_hierarchical_pipeline`.
-- `config.py` todavía tiene las fechas de 2024; actualizarlas es [P12](PLAN.md#p12--partición-temporal-con-separación).
+- `config.py` todavía tiene las fechas de 2024; actualizarlas es [P12](docs/PLAN.md#p12--partición-temporal-con-separación).
 
 ---
 
@@ -334,7 +336,7 @@ gantt
 
 - `main` siempre funciona; el trabajo va en ramas `feature/<descripción>`.
 - Se fusiona a `main` por pull request con al menos una revisión.
-- El orden de fusión de las ramas abiertas está en [PLAN.md · Flujos](PLAN.md#6-flujos).
+- El orden de fusión de las ramas abiertas está en [PLAN.md · Flujos](docs/PLAN.md#6-flujos).
 - Commits descriptivos en español, con prefijo:
 
 | Prefijo | Uso |

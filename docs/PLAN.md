@@ -1,14 +1,10 @@
 # Plan de acción · Anticipando el caos aéreo
 
-Proyecto de Aprendizaje automático (520291, MUCSI Deusto). Versión visual, revisada contra `main` (`7338495`).
+Proyecto de Aprendizaje automático (520291, MUCSI Deusto). Versión visual.
 
-Este plan concreta el README y el documento «Reunión de equipo». Muestra qué existe, qué falta, quién lo hace y en qué orden. Cada tarea dice qué hacer, por qué, cuándo está terminada y qué archivo deja. El reparto de personas es una propuesta que sigue los roles del README; el equipo la ajusta.
+Este plan concreta el README y el documento «Reunión de equipo». Muestra qué hay que hacer, quién lo hace y en qué orden. Cada tarea dice qué hacer, por qué, cuándo está terminada y qué archivo deja. El reparto de personas es una propuesta que sigue los roles del README; el equipo la ajusta.
 
-> **Dónde estamos.** La descarga y los cargadores funcionan, y los siete arreglos de la reunión están hechos. Falta casi todo lo que viene después de cargar.
->
-> **Qué bloquea.** La partición de `config.py` sigue en 2024, y las horas UTC solo cubren 20 aeropuertos: el resto de vuelos se pierde sin aviso.
->
-> **Qué va primero.** La base del repositorio (B1–B9) y el preprocesamiento hasta congelar los datos (P1–P14). Los modelos no arrancan con datos sin congelar.
+> **Hasta dónde va cada tarea está en [ESTADO.md](ESTADO.md).** Este plan cambia poco; el estado cambia en cada PR. Por eso viven separados.
 
 ---
 
@@ -18,7 +14,7 @@ Este plan concreta el README y el documento «Reunión de equipo». Muestra qué
 2. [Cinco principios](#2-cinco-principios)
 3. [Mapa del sistema](#3-mapa-del-sistema)
 4. [Quién hace qué](#4-quién-hace-qué)
-5. [Estado actual del repositorio](#5-estado-actual-del-repositorio)
+5. [Estado del repositorio](#5-estado-del-repositorio)
 6. [Flujos](#6-flujos)
 7. [Tabla de acción](#7-tabla-de-acción)
 8. [Estructura de carpetas](#8-estructura-de-carpetas)
@@ -34,13 +30,7 @@ Este plan concreta el README y el documento «Reunión de equipo». Muestra qué
 
 ## 1. Cómo leer este plan
 
-**Estados**
-
-| Marca | Significado | En los diagramas |
-|---|---|---|
-| ● Hecho | Está en `main` y cumple el «hecho cuando». | Caja negra |
-| ◐ Parcial | Existe código, pero le falta algo para cumplir el «hecho cuando». | Borde naranja |
-| ○ Pendiente | No existe todavía. | Caja gris discontinua |
+**Estados.** Viven solo en [ESTADO.md](ESTADO.md), junto con su leyenda y los hallazgos abiertos. El plan no los repite.
 
 **Fuentes**
 
@@ -72,7 +62,7 @@ Todo el plan sale de estas cinco reglas. Si una tarea las rompe, la tarea está 
 
 ## 3. Mapa del sistema
 
-Cada caja es un paso del sistema, con la tarea que lo cubre y el estado de hoy.
+Cada caja es un paso del sistema, con la tarea que lo cubre.
 
 ```mermaid
 %%{init: {'theme':'neutral'}}%%
@@ -118,13 +108,6 @@ flowchart LR
     FRZ --> CM --> OOF --> I1
     FRZ --> RM --> I1
     I1 --> TST --> USE
-
-    classDef done fill:#1f1f1f,stroke:#1f1f1f,color:#ffffff
-    classDef partial fill:#ffffff,stroke:#d9480f,stroke-width:2px,color:#1f1f1f
-    classDef pending fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray:4 3,color:#555555
-    class BTS,OM,IEM done
-    class DL,UTC,LAB,CONG,WX,FE,SPL,FRZ,CM partial
-    class WIN,CAN,WL,PIPE,OOF,RM,I1,TST,USE pending
 ```
 
 El orden importa en tres sitios, y por eso el flujo es una sola línea:
@@ -178,78 +161,9 @@ Propuesta construida sobre los roles del README. Emilio apoya el preprocesamient
 
 ---
 
-## 5. Estado actual del repositorio
+## 5. Estado del repositorio
 
-Revisión hecha sobre `main` (`7338495`) y las ramas `emilio_branch` y `feature/clasificacion-alberto`.
-
-### 5.1 Cuántas tareas hay en cada estado
-
-```mermaid
-%%{init: {'theme':'neutral'}}%%
-pie showData
-    title Estado de las 44 tareas
-    "Hecho" : 1
-    "Parcial" : 15
-    "Pendiente" : 28
-```
-
-| Fase | ● Hecho | ◐ Parcial | ○ Pendiente |
-|---|---|---|---|
-| B · Base del repositorio | 0 | 2 | 7 |
-| P · Preprocesamiento | 1 | 9 | 4 |
-| C · Clasificación | 0 | 3 | 4 |
-| R · Regresión | 0 | 0 | 4 |
-| I · Integración | 0 | 1 | 6 |
-| E · Entrega | 0 | 0 | 3 |
-
-### 5.2 Qué se resolvió desde la primera revisión
-
-| Hallazgo | Cómo quedó |
-|---|---|
-| Hashes de los datos crudos | SHA-256 por mes de BTS y por archivo de clima, en `data/data_contract.md`. |
-| Descarga de BTS manual | `download_data.py --source bts` la automatiza. |
-| Cargadores con errores | `load_open_meteo` y `load_iem` renombran bien y pasan «M» y «T» a ausente. |
-| Sin pruebas | Hay seis en `tests/test_data_feature_engineering.py`. |
-| Periodo corto | `DATA_START = 2024-02-01` y `DATA_END = 2025-12-31` en `config.py`. |
-| Los siete arreglos de la reunión §1 | Resta de conjunto (`TypeError`), `>=` en la partición, fórmula del rumbo, hora 2400, «M» a ausente, errata `airpot_iata` y nombres de columna de Open-Meteo. |
-
-### 5.3 Qué sigue abierto
-
-| Hallazgo | Tarea |
-|---|---|
-| `sys.path.append` en los cinco módulos de `src/`, en `download_data.py` y en el notebook 04. | B2 |
-| Las estructuras de aeropuertos están en cuatro sitios: `CORE_HUBS`, dos `HUB_COORDS` y `AIRPORT_TIMEZONES`, más `IATA_TO_ICAO`. | B3 |
-| El horizonte de cuatro horas vive en `preprocessing.py`, no en `config.py`. | B4 |
-| `requirements.txt` solo tiene cotas mínimas (`>=`). | B5 |
-| La descarga captura `except Exception`, sigue y termina con código 0. | B6 |
-| El contrato llama «reanálisis» a Open-Meteo *Previous Runs*. | P1 |
-| `LEAKAGE_COLUMNS` es una lista negra. | P2 |
-| Open-Meteo se descarga con `day0`, que es fuga. | P8 |
-| `src/evaluation.py` son plantillas vacías en `main`. | C1, R3 |
-| El notebook 04 no está ejecutado, usa SMOTE y `is_unbalance`. | C1–C3 |
-
-### 5.4 Qué apareció en esta revisión
-
-| Hallazgo | Por qué importa | Tarea |
-|---|---|---|
-| La partición de `config.py` sigue en 2024. | Con datos hasta dic-2025, train queda en feb–ago 2024 (sin diciembre ni enero) y test, sin fecha de fin, en 14 meses. | P12 |
-| `convert_crs_to_utc` solo conoce 20 zonas horarias. | El resto de vuelos queda sin hora, y el cruce de clima lo borra sin avisar (`dropna`). | P4 |
-| Signo del viento de cara invertido. | Con la convención meteorológica, el viento de cara es `+V·cos(dir − rumbo)`; el código lleva un menos. La prueba solo comprueba que la columna existe. | P8 |
-| La congestión cuenta vuelos por día. | El plan pide por hora y antes de quitar cancelados. | P7 |
-| IEM pide `skyc1`, no `skyl1`. | `skyc1` dice la cobertura, no la altura: no da el techo de nubes. | P9 |
-| Casos borde de la etiqueta. | El código D y los desviados caen en «sin retraso»; seguridad se ignora; un retraso sin causa va a aerolínea. | P5 |
-| `load_bts(months=…)` filtra el mes sin mirar el año. | `months=[2]` trae febrero de 2024 y de 2025. | P3 |
-| Columna duplicada `prediction_time_utc`. | Dos nombres para la misma hora. | P3 |
-| Archivos de clima con `_2024` en el nombre. | Cubren dos años. | B6 |
-| `.gitignore` con errores. | `_pycache_/` está mal escrito; `models/*/.joblib` no ignora ningún modelo; `*.csv` también ignoraría el manifiesto; los Parquet no se ignoran. | B1 |
-| Tres `.DS_Store` versionados. | Ruido en cada cambio. | B1 |
-| `python -m unittest` corre cero pruebas. | Falta `tests/__init__.py`. | B2 |
-| Una prueba necesita los datos reales y no se salta. | Falla en cualquier clon limpio. | B7 |
-| La prueba de partición fija las fechas de 2024. | Hay que cambiarla con P12. | B7 |
-| Ramas pendientes. | `emilio_branch` choca con `main`; `feature/clasificacion-alberto` nació antes que `main` y arrastra versiones viejas de `src/`. | B9 |
-| No existen los notebooks 01, 02, 03, 05, 06 ni 07. | Solo hay un 04, en la rama de Alberto. | P11, P13, R, I |
-| El contrato dice «~1,49 M vuelos». | La descarga trae todos los aeropuertos: una prueba exige más de 500 000 filas solo en febrero. Recontar. | P1 |
-| Datos de unos 5 GB. | No caben en git; necesitan Release o carpeta compartida. | B8 |
+Qué está hecho y qué falta en cada tarea, y los hallazgos abiertos de la revisión, están en [ESTADO.md](ESTADO.md). Se actualiza en el mismo PR que avanza la tarea.
 
 ---
 
@@ -278,11 +192,6 @@ flowchart TD
     A --> B --> C --> D --> E
     E -- sí --> X
     E -- no --> F --> G --> H --> I --> J --> K
-
-    classDef partial fill:#ffffff,stroke:#d9480f,stroke-width:2px,color:#1f1f1f
-    classDef pending fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray:4 3,color:#555555
-    class A,B,C,F,G,I,K partial
-    class D,E,X,H,J pending
 ```
 
 Cada paso que borre filas deja una línea en el registro de decisiones con cuántas y por qué. Hoy el cruce de clima borra filas sin hora y nadie se entera [Revisión].
@@ -349,11 +258,6 @@ flowchart LR
     H --> K
     H --> CAL --> CA
     H --> O --> P
-
-    classDef partial fill:#ffffff,stroke:#d9480f,stroke-width:2px,color:#1f1f1f
-    classDef pending fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray:4 3,color:#555555
-    class B,M,H partial
-    class S,K,CAL,CA,O,P pending
 ```
 
 De dónde sale cada probabilidad que recibe el regresor:
@@ -391,9 +295,6 @@ flowchart LR
     D --> SEL --> T
     T --> G
     T --> U
-
-    classDef pending fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray:4 3,color:#555555
-    class S,P,RB,RM,RE,WO,WI,D,SEL,T,G,U pending
 ```
 
 La comparación con y sin probabilidades es lo que **nunca se recorta** (§12).
@@ -424,137 +325,99 @@ flowchart LR
 
 ## 7. Tabla de acción
 
-Cada fila enlaza con su detalle en la §11. «Qué falta hoy» resume la revisión de `main`.
+Cada fila enlaza con su detalle en la §11. Hasta dónde va cada tarea está en [ESTADO.md](ESTADO.md).
 
 ### Base del repositorio
 
-| ID | Tarea | Responsable | Apoyo | Estado | Qué falta hoy | Deja |
-|---|---|---|---|---|---|---|
-| [B1](#b1--gitignore-correcto) | `.gitignore` correcto y fuera los `.DS_Store` | Emilio | — | ○ | Patrones mal escritos; tres `.DS_Store` versionados | `.gitignore` |
-| [B2](#b2--importar-sin-syspath) | Importar sin `sys.path` y descubrir las pruebas | Alberto | Camilo | ○ | `sys.path.append` en seis `.py` y el notebook 04; falta `tests/__init__.py` | `tests/__init__.py` |
-| [B3](#b3--una-sola-fuente-de-aeropuertos) | Una sola fuente de aeropuertos | Camilo | — | ○ | Datos de aeropuertos en cuatro sitios | `data/reference/airports.csv` |
-| [B4](#b4--constantes-en-configpy) | Constantes en `config.py` | Camilo | — | ○ | Horizonte de 4 h fuera de config | `config.py` |
-| [B5](#b5--entorno-fijado) | Entorno fijado | Dylan | — | ○ | Solo cotas `>=`; sin versión de Python | `requirements.txt`, `.python-version` |
-| [B6](#b6--descarga-que-falla-en-voz-alta) | Descarga que falla en voz alta | Camilo | Emilio | ○ | Errores tragados; nombres con `_2024` | `data/raw/download_data.py` |
-| [B7](#b7--pruebas-separadas) | Pruebas separadas por tipo | Dylan | Camilo | ◐ | La de datos reales no se salta; la de partición fija 2024; la de viento no mira el signo | `tests/` |
-| [B8](#b8--datos-compartidos) | Datos compartidos y verificables | Emilio | Camilo | ◐ | Hashes sí; falta Release, manifiesto y script de verificación | `data/manifest.csv`, `data/raw/fetch_data.py` |
-| [B9](#b9--fusionar-ramas) | Fusionar ramas pendientes | Alberto · Emilio | Dylan | ○ | Una rama vieja y una con conflictos | `main` limpio |
+| ID | Tarea | Responsable | Apoyo | Deja |
+|---|---|---|---|---|
+| [B1](#b1--gitignore-correcto) | `.gitignore` correcto y fuera los `.DS_Store` | Emilio | — | `.gitignore` |
+| [B2](#b2--importar-sin-syspath) | Importar sin `sys.path` y descubrir las pruebas | Alberto | Camilo | `tests/__init__.py` |
+| [B3](#b3--una-sola-fuente-de-aeropuertos) | Una sola fuente de aeropuertos | Camilo | — | `data/reference/airports.csv` |
+| [B4](#b4--constantes-en-configpy) | Constantes en `config.py` | Camilo | — | `config.py` |
+| [B5](#b5--entorno-fijado) | Entorno fijado | Dylan | — | `requirements.txt`, `.python-version` |
+| [B6](#b6--descarga-que-falla-en-voz-alta) | Descarga que falla en voz alta | Camilo | Emilio | `data/raw/download_data.py` |
+| [B7](#b7--pruebas-separadas) | Pruebas separadas por tipo | Dylan | Camilo | `tests/` |
+| [B8](#b8--datos-compartidos) | Datos compartidos y verificables | Emilio | Camilo | `data/manifest.csv`, `data/raw/fetch_data.py` |
+| [B9](#b9--fusionar-ramas) | Fusionar ramas pendientes | Alberto · Emilio | Dylan | `main` limpio |
 
 ### Preprocesamiento
 
-| ID | Tarea | Responsable | Apoyo | Estado | Qué falta hoy | Deja |
-|---|---|---|---|---|---|---|
-| [P1](#p1--contrato-de-datos-y-trazabilidad) | Contrato de datos y trazabilidad | Emilio | Camilo | ◐ | «Reanálisis»; `skyc1` como techo; recuento de filas; seis bloques del Playbook | `data/data_contract.md` |
-| [P2](#p2--lista-blanca-de-variables) | Lista blanca de variables | Camilo | Alberto, Dylan | ○ | Hoy es lista negra | `config.py`, `tests/test_leakage.py` |
-| [P3](#p3--arreglos-de-carga-y-transformación) | Arreglos de carga y transformación | Camilo | — | ● | Dos restos: filtro de meses sin año y columna duplicada | `src/` |
-| [P4](#p4--horas-en-utc-para-todos-los-aeropuertos) | Horas UTC de todos los aeropuertos | Camilo | — | ◐ | Solo 20 zonas; filas borradas sin aviso | `src/preprocessing.py` |
-| [P5](#p5--etiquetas) | Etiquetas | Camilo | Alberto | ◐ | Código D, desviados, seguridad y retraso sin causa | `src/preprocessing.py` |
-| [P6](#p6--ventana-de-retrasos-recientes) | Ventana de retrasos recientes | Camilo | Dylan | ○ | No existe | `feature_engineering.recent_delays()` |
-| [P7](#p7--congestión-programada) | Congestión programada | Camilo | — | ◐ | Cuenta por día; falta asegurar que va antes de quitar cancelados | `feature_engineering.py` |
-| [P8](#p8--clima-pronóstico-archivado-open-meteo) | Clima: pronóstico archivado | Emilio | Camilo | ◐ | `day0`; signo del viento de cara; solo origen | `download_data.py`, `feature_engineering.py` |
-| [P9](#p9--clima-observado-iem-asosmetar) | Clima observado | Emilio | Camilo | ◐ | `skyc1` sin `skyl1`; solo origen; sin antigüedad | `download_data.py`, `preprocessing.py` |
-| [P10](#p10--variables-de-calendario-y-ruta) | Calendario y ruta | Camilo | — | ◐ | Niveles raros y tamaño FAA | `feature_engineering.py` |
-| [P11](#p11--eda-guiado-por-preguntas) | EDA guiado por preguntas | Camilo (BTS) · Emilio (clima) | — | ○ | Notebooks 01 y 02 no existen | `01_eda_bts`, `02_eda_weather` |
-| [P12](#p12--partición-temporal-con-separación) | Partición temporal | Camilo | Alberto, Dylan | ◐ | Fechas de 2024 en config | `config.py`, `preprocessing.py` |
-| [P13](#p13--transformaciones-dentro-de-un-pipeline) | Transformaciones en un `Pipeline` | Camilo | Alberto, Dylan | ○ | No existe | `preprocessing.build_pipeline()`, `models/preprocessor.joblib` |
-| [P14](#p14--calidad-y-congelación-de-datos) | Calidad y congelación | Emilio | Camilo | ◐ | `save_splits` existe; faltan reglas, informe y hashes | `data/processed/splits/`, `results/quality_report.md` |
+| ID | Tarea | Responsable | Apoyo | Deja |
+|---|---|---|---|---|
+| [P1](#p1--contrato-de-datos-y-trazabilidad) | Contrato de datos y trazabilidad | Emilio | Camilo | `data/data_contract.md` |
+| [P2](#p2--lista-blanca-de-variables) | Lista blanca de variables | Camilo | Alberto, Dylan | `config.py`, `tests/test_leakage.py` |
+| [P3](#p3--arreglos-de-carga-y-transformación) | Arreglos de carga y transformación | Camilo | — | `src/` |
+| [P4](#p4--horas-en-utc-para-todos-los-aeropuertos) | Horas UTC de todos los aeropuertos | Camilo | — | `src/preprocessing.py` |
+| [P5](#p5--etiquetas) | Etiquetas | Camilo | Alberto | `src/preprocessing.py` |
+| [P6](#p6--ventana-de-retrasos-recientes) | Ventana de retrasos recientes | Camilo | Dylan | `feature_engineering.recent_delays()` |
+| [P7](#p7--congestión-programada) | Congestión programada | Camilo | — | `feature_engineering.py` |
+| [P8](#p8--clima-pronóstico-archivado-open-meteo) | Clima: pronóstico archivado | Emilio | Camilo | `download_data.py`, `feature_engineering.py` |
+| [P9](#p9--clima-observado-iem-asosmetar) | Clima observado | Emilio | Camilo | `download_data.py`, `preprocessing.py` |
+| [P10](#p10--variables-de-calendario-y-ruta) | Calendario y ruta | Camilo | — | `feature_engineering.py` |
+| [P11](#p11--eda-guiado-por-preguntas) | EDA guiado por preguntas | Camilo (BTS) · Emilio (clima) | — | `01_eda_bts`, `02_eda_weather` |
+| [P12](#p12--partición-temporal-con-separación) | Partición temporal | Camilo | Alberto, Dylan | `config.py`, `preprocessing.py` |
+| [P13](#p13--transformaciones-dentro-de-un-pipeline) | Transformaciones en un `Pipeline` | Camilo | Alberto, Dylan | `preprocessing.build_pipeline()`, `models/preprocessor.joblib` |
+| [P14](#p14--calidad-y-congelación-de-datos) | Calidad y congelación | Emilio | Camilo | `data/processed/splits/`, `results/quality_report.md` |
 
 ### Clasificación
 
-| ID | Tarea | Responsable | Apoyo | Estado | Qué falta hoy | Deja |
-|---|---|---|---|---|---|---|
-| [C1](#c1--baselines) | Baselines | Alberto | — | ◐ | Notebook 04 sin ejecutar; funciones solo en su rama | `04_classification`, `src/evaluation.py` |
-| [C2](#c2--modelos-candidatos) | Modelos candidatos | Alberto | — | ◐ | SMOTE y submuestreo; `is_unbalance` en multiclase | `04_classification` |
-| [C3](#c3--optimización-de-hiperparámetros) | Búsqueda de hiperparámetros | Alberto | — | ◐ | Comprobar separación entre bloques y criterio AUC-PR | `04_classification` |
-| [C4](#c4--diagnóstico-de-capacidad) | Diagnóstico de capacidad | Alberto | — | ○ | — | `04_classification` |
-| [C5](#c5--calibración-y-umbral) | Calibración y umbral | Alberto | Dylan | ○ | — | `04_classification` |
-| [C6](#c6--evaluación-de-la-causa) | Evaluación de la causa | Alberto | — | ○ | — | `04_classification` |
-| [C7](#c7--probabilidades-fuera-de-pliegue-para-el-regresor) | Probabilidades fuera de pliegue | Alberto | Dylan | ○ | Hoy exporta `predict_proba` sobre validación | `oof_probs.parquet`, `evaluation.oof_predict()` |
+| ID | Tarea | Responsable | Apoyo | Deja |
+|---|---|---|---|---|
+| [C1](#c1--baselines) | Baselines | Alberto | — | `04_classification`, `src/evaluation.py` |
+| [C2](#c2--modelos-candidatos) | Modelos candidatos | Alberto | — | `04_classification` |
+| [C3](#c3--optimización-de-hiperparámetros) | Búsqueda de hiperparámetros | Alberto | — | `04_classification` |
+| [C4](#c4--diagnóstico-de-capacidad) | Diagnóstico de capacidad | Alberto | — | `04_classification` |
+| [C5](#c5--calibración-y-umbral) | Calibración y umbral | Alberto | Dylan | `04_classification` |
+| [C6](#c6--evaluación-de-la-causa) | Evaluación de la causa | Alberto | — | `04_classification` |
+| [C7](#c7--probabilidades-fuera-de-pliegue-para-el-regresor) | Probabilidades fuera de pliegue | Alberto | Dylan | `oof_probs.parquet`, `evaluation.oof_predict()` |
 
 ### Regresión
 
-| ID | Tarea | Responsable | Apoyo | Estado | Qué falta hoy | Deja |
-|---|---|---|---|---|---|---|
-| [R1](#r1--baselines) | Baselines | Dylan | — | ○ | — | `05_regression` |
-| [R2](#r2--modelos) | Modelos | Dylan | — | ○ | — | `05_regression` |
-| [R3](#r3--métricas-y-cola-larga) | Métricas y cola larga | Dylan | — | ○ | Funciones de regresión vacías | `05_regression`, `src/evaluation.py` |
-| [R4](#r4--residuos-y-capacidad) | Residuos y capacidad | Dylan | — | ○ | — | `05_regression` |
+| ID | Tarea | Responsable | Apoyo | Deja |
+|---|---|---|---|---|
+| [R1](#r1--baselines) | Baselines | Dylan | — | `05_regression` |
+| [R2](#r2--modelos) | Modelos | Dylan | — | `05_regression` |
+| [R3](#r3--métricas-y-cola-larga) | Métricas y cola larga | Dylan | — | `05_regression`, `src/evaluation.py` |
+| [R4](#r4--residuos-y-capacidad) | Residuos y capacidad | Dylan | — | `05_regression` |
 
 ### Integración
 
-| ID | Tarea | Responsable | Apoyo | Estado | Qué falta hoy | Deja |
-|---|---|---|---|---|---|---|
-| [I1](#i1--regresor-con-y-sin-probabilidades) | Regresor con y sin probabilidades | Dylan | Emilio | ○ | — | `06_hierarchical_pipeline` |
-| [I2](#i2--selección-final-y-test-único) | Selección final y test único | Emilio | Alberto, Dylan | ○ | — | `06_hierarchical_pipeline`, `results/experiment_log.md` |
-| [I3](#i3--análisis-de-errores-por-grupos) | Errores por grupos | Emilio | Alberto, Dylan | ○ | — | `07_error_analysis` |
-| [I4](#i4--interpretación) | Interpretación | Alberto · Dylan | Emilio | ○ | — | `04`, `05` |
-| [I5](#i5--propuesta-de-uso) | Propuesta de uso | Emilio | Dylan | ○ | — | `predict_flight()` |
-| [I6](#i6--ciclo-de-vida) | Ciclo de vida | Emilio | Camilo | ○ | — | Memoria |
-| [I7](#i7--reproducibilidad) | Reproducibilidad | Emilio | Todos | ◐ | Semillas sí; versiones sin fijar; notebooks sin salidas | `README.md` |
+| ID | Tarea | Responsable | Apoyo | Deja |
+|---|---|---|---|---|
+| [I1](#i1--regresor-con-y-sin-probabilidades) | Regresor con y sin probabilidades | Dylan | Emilio | `06_hierarchical_pipeline` |
+| [I2](#i2--selección-final-y-test-único) | Selección final y test único | Emilio | Alberto, Dylan | `06_hierarchical_pipeline`, `results/experiment_log.md` |
+| [I3](#i3--análisis-de-errores-por-grupos) | Errores por grupos | Emilio | Alberto, Dylan | `07_error_analysis` |
+| [I4](#i4--interpretación) | Interpretación | Alberto · Dylan | Emilio | `04`, `05` |
+| [I5](#i5--propuesta-de-uso) | Propuesta de uso | Emilio | Dylan | `predict_flight()` |
+| [I6](#i6--ciclo-de-vida) | Ciclo de vida | Emilio | Camilo | Memoria |
+| [I7](#i7--reproducibilidad) | Reproducibilidad | Emilio | Todos | `README.md` |
 
 ### Entrega
 
-| ID | Tarea | Responsable | Apoyo | Estado | Qué falta hoy | Deja |
-|---|---|---|---|---|---|---|
-| [E1](#e1--memoria) | Memoria | Emilio | Todos, cada uno su sección | ○ | — | `docs/memoria.pdf` |
-| [E2](#e2--defensa) | Defensa | Todos | — | ○ | — | `docs/defensa.pdf` |
-| [E3](#e3--zip) | ZIP | Emilio | — | ○ | — | Entrega |
+| ID | Tarea | Responsable | Apoyo | Deja |
+|---|---|---|---|---|
+| [E1](#e1--memoria) | Memoria | Emilio | Todos, cada uno su sección | `docs/memoria.pdf` |
+| [E2](#e2--defensa) | Defensa | Todos | — | `docs/defensa.pdf` |
+| [E3](#e3--zip) | ZIP | Emilio | — | Entrega |
 
 ---
 
 ## 8. Estructura de carpetas
 
-### 8.1 Hoy, en `main`
+### 8.1 Hoy
 
-```text
-ProyectoAprendizajeSupervisado/
-├── .DS_Store                 ← versionado por error (B1)
-├── .gitignore
-├── PLAN.md
-├── README.md
-├── config.py
-├── requirements.txt
-├── data/
-│   ├── .DS_Store             ← versionado por error (B1)
-│   ├── data_contract.md
-│   ├── raw/
-│   │   ├── download_data.py
-│   │   ├── bts/              vacío, con .gitkeep
-│   │   ├── iem/              vacío, con .gitkeep
-│   │   └── open_meteo/       vacío, con .gitkeep
-│   └── processed/
-│       ├── .DS_Store         ← versionado por error (B1)
-│       └── splits/           vacío, con .gitkeep
-├── docs/                     vacío
-├── models/
-│   ├── classification/       vacío
-│   └── regression/           vacío
-├── notebooks/                vacío (el 04 está en la rama de Alberto)
-├── results/
-│   ├── experiment_log.md
-│   ├── figures/
-│   └── tables/
-├── src/
-│   ├── __init__.py
-│   ├── data_loading.py
-│   ├── evaluation.py         plantillas vacías
-│   ├── feature_engineering.py
-│   ├── preprocessing.py
-│   └── utils.py
-└── tests/
-    └── test_data_feature_engineering.py
-```
+La estructura actual está en el [README](../README.md#estructura-del-repositorio). No se repite aquí para que no se desfase.
 
 ### 8.2 Objetivo
 
-Lo que no está hoy va marcado con su tarea y su responsable.
+Cada pieza nueva va marcada con su tarea y su responsable.
 
 ```text
 ProyectoAprendizajeSupervisado/
-├── .gitattributes                     PLAN.md fuera del ZIP (E3 · Emilio)
+├── .gitattributes                     plan y estado fuera del ZIP (E3 · Emilio)
 ├── .gitignore                         B1 · Emilio
 ├── .python-version                    B5 · Dylan
-├── PLAN.md                            coordinación; no entra en el ZIP
 ├── README.md                          punto de entrada: cómo ejecutar
 ├── config.py                          única fuente de fechas, horizonte y lista blanca
 ├── pyproject.toml                     B2 · imports sin sys.path
@@ -602,6 +465,8 @@ ProyectoAprendizajeSupervisado/
 │   ├── test_leakage.py                P2 · lista blanca y T_corte
 │   └── test_real_data.py              B7 · se salta si faltan los datos
 └── docs/
+    ├── ESTADO.md                      estado de cada tarea; no entra en el ZIP
+    ├── PLAN.md                        coordinación; no entra en el ZIP
     ├── memoria.pdf                    E1
     └── defensa.pdf                    E2
 ```
@@ -690,7 +555,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### B1 · `.gitignore` correcto
 
-- **Responsable:** Emilio. **Estado:** ○.
+- **Responsable:** Emilio.
 - **Qué:**
   - Tomar el `.gitignore` de `emilio_branch` como base.
   - `__pycache__/` en lugar de `_pycache_/`.
@@ -701,7 +566,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### B2 · Importar sin `sys.path`
 
-- **Responsable:** Alberto, con Camilo. **Estado:** ○.
+- **Responsable:** Alberto, con Camilo.
 - **Qué:**
   - Quitar `sys.path.append` de los cinco módulos de `src/`, de `data/raw/download_data.py` y del notebook 04.
   - Un `pyproject.toml` mínimo que declare el paquete `src` y el módulo `config`, y `pip install -e .` en cada máquina. Así `from src…` e `import config` funcionan desde la raíz, desde `tests/` y desde los notebooks.
@@ -711,27 +576,27 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### B3 · Una sola fuente de aeropuertos
 
-- **Responsable:** Camilo. **Estado:** ○.
+- **Responsable:** Camilo.
 - **Qué:** un único `data/reference/airports.csv` con IATA, ICAO, zona horaria, latitud, longitud y tamaño FAA. Lo leen `config.py`, la descarga, `preprocessing.py` y `feature_engineering.py`. Hoy hay cuatro copias: `CORE_HUBS`, `HUB_COORDS` (dos veces), `AIRPORT_TIMEZONES` e `IATA_TO_ICAO`.
 - **Por qué:** cuatro copias acaban diciendo cosas distintas. Además, P4 necesita las zonas de todos los aeropuertos, no de 20.
 - **Hecho cuando:** buscar `HUB_COORDS` o `AIRPORT_TIMEZONES` en el código no devuelve definiciones, solo lecturas del CSV.
 
 #### B4 · Constantes en `config.py`
 
-- **Responsable:** Camilo. **Estado:** ○.
+- **Responsable:** Camilo.
 - **Qué:** mover a `config.py` el horizonte de 4 h (`PREDICTION_HORIZON_H`), la tolerancia del cruce de clima, la ventana de retrasos recientes y las fechas de partición de P12.
 - **Hecho cuando:** cambiar el corte de 4 a 3 horas se hace en una sola línea.
 
 #### B5 · Entorno fijado
 
-- **Responsable:** Dylan. **Estado:** ○.
+- **Responsable:** Dylan.
 - **Qué:** versiones exactas en `requirements.txt` (`==`), sacadas del entorno donde corren los notebooks; versión de Python en `.python-version` y en el README.
 - **Por qué:** con `>=`, el profesor puede instalar una versión de scikit-learn que cambia resultados o argumentos [Enunciado, reproducibilidad].
 - **Hecho cuando:** un entorno nuevo instalado desde `requirements.txt` corre las pruebas y el notebook 03.
 
 #### B6 · Descarga que falla en voz alta
 
-- **Responsable:** Camilo, con Emilio. **Estado:** ○.
+- **Responsable:** Camilo, con Emilio.
 - **Qué:**
   - Quitar los `except Exception` que imprimen y siguen. Reintentar lo recuperable y, si falla, terminar con código distinto de cero.
   - Al final, un resumen: archivos esperados, descargados y fallidos.
@@ -740,7 +605,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### B7 · Pruebas separadas
 
-- **Responsable:** Dylan, con Camilo. **Estado:** ◐.
+- **Responsable:** Dylan, con Camilo.
 - **Qué:**
   - Separar las pruebas unitarias, con datos construidos a mano, de la prueba con datos reales.
   - La de datos reales se salta (`unittest.skipUnless`) si no están los archivos.
@@ -750,7 +615,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### B8 · Datos compartidos
 
-- **Responsable:** Emilio, con Camilo. **Estado:** ◐ (los hashes ya están en el contrato).
+- **Responsable:** Emilio, con Camilo.
 - **Qué:**
   - Subir los crudos (o un Parquet reducido a las columnas de la lista blanca más las de etiqueta) como *assets* de una Release de GitHub. Si superan el límite por archivo, dividir por mes.
   - `data/manifest.csv`: archivo, tamaño, sha256, URL de origen y fecha de extracción.
@@ -760,7 +625,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### B9 · Fusionar ramas
 
-- **Responsables:** Alberto (su rama) y Emilio (la suya), con Dylan de revisor. **Estado:** ○.
+- **Responsables:** Alberto (su rama) y Emilio (la suya), con Dylan de revisor.
 - **Qué:** el orden de la §6.5. Primero la rama de base; después el *rebase* de `feature/clasificacion-alberto`, con solo sus archivos; de `emilio_branch`, solo el `.gitignore`.
 - **Hecho cuando:** no quedan ramas con trabajo sin fusionar, y `main` pasa las pruebas.
 
@@ -768,59 +633,57 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P1 · Contrato de datos y trazabilidad
 
-- **Responsable:** Emilio, con Camilo. **Estado:** ◐.
+- **Responsable:** Emilio, con Camilo.
 - **Qué:**
   - Completar `data/data_contract.md` con los seis bloques del Playbook §1.6: identidad, propósito, esquema, calidad, servicio y evolución.
   - Por cada fuente, registrar origen, responsable, frecuencia, zona horaria, términos de uso y momento de extracción. Para las API, también *endpoint*, parámetros y hora de la llamada [Playbook §1.3].
   - Corregir «reanálisis» por **«pronóstico archivado»** en Open-Meteo: *Previous Runs* guarda lo que se pronosticó, no lo que ocurrió.
   - Corregir «`skyc1` (techo)»: el techo sale de `skyl1` (P9).
   - Recontar los vuelos: «~1,49 M» no cuadra con todos los aeropuertos en 23 meses.
-- **Ya hecho:** SHA-256 por mes de BTS y por archivo de clima.
 - **Por qué:** la rúbrica evalúa trazabilidad y prevención de fugas (9 %), y el profesor debe poder acceder a los datos [Enunciado].
 - **Hecho cuando:** cada archivo crudo tiene SHA-256, URL y fecha en `data/manifest.csv`, y hay una copia compartible (B8).
 
 #### P2 · Lista blanca de variables
 
-- **Responsable:** Camilo, con Alberto y Dylan. **Estado:** ○.
+- **Responsable:** Camilo, con Alberto y Dylan.
 - **Qué:** sustituir `LEAKAGE_COLUMNS` por una lista blanca `FEATURES_ALLOWED` en `config.py`. Cada variable lleva su momento de disponibilidad respecto a T_corte (árbol del Playbook §1.2: si t ≤ T_corte, entra en X).
 - **Por qué:** una lista negra falla en silencio cuando aparece una columna nueva. Hoy deja pasar `AirTime`, `Cancelled`, `CancellationCode` y `Tail_Number` [Reunión §2]. Es la ruta de fuga temporal de [S03].
 - **Hecho cuando:** `tests/test_leakage.py` comprueba que las columnas de X son un subconjunto de la lista blanca, y falla si entra otra.
 
 #### P3 · Arreglos de carga y transformación
 
-- **Responsable:** Camilo. **Estado:** ● (los siete arreglos de la [Reunión §1]), con dos restos.
+- **Responsable:** Camilo. Los siete primeros arreglos salen de la [Reunión §1]; los dos últimos, de la [Revisión].
 
-| Arreglo | Dónde | Estado |
-|---|---|---|
-| `load_bts` permite construir la etiqueta antes de quitar columnas de fuga (`drop_leakage=False`). | `data_loading.py` | ● |
-| `load_open_meteo` usa los nombres de columna nuevos. | `data_loading.py` | ● |
-| `load_iem`: errata `airpot_iata` y «M» en todas las columnas. | `data_loading.py` | ● |
-| `convert_crs_to_utc`: tipo correcto y hora 2400 al día siguiente. | `preprocessing.py` | ● |
-| `build_classification_label` sin `TypeError`. | `preprocessing.py` | ● |
-| `split_temporal` con `>=`. | `preprocessing.py` | ● |
-| `compute_bearing` con la fórmula correcta. | `feature_engineering.py` | ● |
-| **Resto:** `load_bts(months=…)` filtra el mes sin el año. | `data_loading.py` | ○ |
-| **Resto:** `prediction_time_utc` duplica una hora que ya existe. | `preprocessing.py` | ○ |
+| Arreglo | Dónde |
+|---|---|
+| `load_bts` permite construir la etiqueta antes de quitar columnas de fuga (`drop_leakage=False`). | `data_loading.py` |
+| `load_open_meteo` usa los nombres de columna nuevos. | `data_loading.py` |
+| `load_iem`: errata `airpot_iata` y «M» en todas las columnas. | `data_loading.py` |
+| `convert_crs_to_utc`: tipo correcto y hora 2400 al día siguiente. | `preprocessing.py` |
+| `build_classification_label` sin `TypeError`. | `preprocessing.py` |
+| `split_temporal` con `>=`. | `preprocessing.py` |
+| `compute_bearing` con la fórmula correcta. | `feature_engineering.py` |
+| `load_bts(months=…)` filtra el mes sin el año. | `data_loading.py` |
+| `prediction_time_utc` duplica una hora que ya existe. | `preprocessing.py` |
 
 - **Hecho cuando:** cada función tiene una prueba mínima con un caso conocido, y el notebook 03 corre de principio a fin.
 
 #### P4 · Horas en UTC para todos los aeropuertos
 
-- **Responsable:** Camilo. **Estado:** ◐.
+- **Responsable:** Camilo.
 - **Qué:**
   - Conservar la hora local y la UTC con el patrón `campo_raw` / `campo_utc` [Playbook].
   - Obtener la zona horaria de cada aeropuerto de la población desde `airports.csv` (B3), no solo de 20.
   - Calcular `T_corte_utc = CRSDep_utc − 4 h`, con el horizonte leído de `config.py`.
   - Contar y registrar las filas sin zona, en vez de dejarlas en `NaT`.
-- **Ya hecho:** la hora 2400 pasa a las 00:00 del día siguiente.
 - **Por qué:** todos los cruces con clima y con la ventana de retrasos dependen de esta hora. Hoy, un vuelo de un aeropuerto sin zona queda en `NaT` y el cruce de clima lo borra sin avisar.
 - **Hecho cuando:** ningún aeropuerto de la población queda sin zona, y una muestra de 20 vuelos revisada a mano coincide.
 
 #### P5 · Etiquetas
 
-- **Responsable:** Camilo, con Alberto. **Estado:** ◐.
+- **Responsable:** Camilo, con Alberto.
 - **Qué:**
-  - Binaria: `retraso = ArrDelay >= 15`, igual que `ArrDel15` de BTS. **Ya hecho.**
+  - Binaria: `retraso = ArrDelay >= 15`, igual que `ArrDel15` de BTS.
   - Causa: la de más minutos entre las cinco columnas de causa, solo si `retraso = 1`. Escribir una regla de desempate fija.
   - Seguridad (`SecurityDelay`) hoy no se mira: incluirla.
   - Vuelo con retraso pero sin minutos de causa: hoy va a aerolínea. Pasarlo a cuarentena y contar cuántos son [Playbook §1.5].
@@ -830,7 +693,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P6 · Ventana de retrasos recientes
 
-- **Responsable:** Camilo, con Dylan. **Estado:** ○.
+- **Responsable:** Camilo, con Dylan.
 - **Qué:**
   - Para cada vuelo, el retraso de los vuelos de su aerolínea que llegan a su aeropuerto de origen en las 2 h anteriores a T_corte.
   - La ventana termina en el corte, nunca centrada.
@@ -844,14 +707,14 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P7 · Congestión programada
 
-- **Responsable:** Camilo. **Estado:** ◐.
+- **Responsable:** Camilo.
 - **Qué:** número de salidas y llegadas programadas en el aeropuerto **en la hora** del vuelo. Hoy `add_hub_congestion` cuenta salidas por día. Se cuenta con **todos** los vuelos programados, cancelados incluidos, antes de filtrar.
 - **Por qué:** el horario programado se conoce de antemano. Contar después de quitar cancelados usa la cancelación, que es fuga [Reunión §2].
 - **Hecho cuando:** el conteo se hace sobre el dataset sin filtrar, y lo comprueba una aserción.
 
 #### P8 · Clima: pronóstico archivado (Open-Meteo)
 
-- **Responsable:** Emilio, con Camilo. **Estado:** ◐.
+- **Responsable:** Emilio, con Camilo.
 - **Qué:**
   - Descargar `_previous_day1`: el pronóstico emitido el día anterior. Hoy se pide `day0`, que es fuga [Reunión §2].
   - Cruzar en origen a la hora de salida programada y en destino a la hora de llegada programada. Hoy se cruza solo en origen, a la hora del corte.
@@ -862,9 +725,9 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P9 · Clima observado (IEM ASOS/METAR)
 
-- **Responsable:** Emilio, con Camilo. **Estado:** ◐.
+- **Responsable:** Emilio, con Camilo.
 - **Qué:**
-  - Última observación anterior a T_corte en origen. **Ya hecho** con `merge_asof` hacia atrás y tolerancia de 4 h.
+  - Última observación anterior a T_corte en origen., con `merge_asof` hacia atrás y tolerancia de 4 h.
   - En destino, también la última anterior a T_corte: no la de la hora de llegada. Hoy no se cruza.
   - «M» pasa a ausente, con un indicador `_was_missing` [S03]. La conversión ya está; falta el indicador.
   - Descargar `skyl1` además de `skyc1`. El techo de nubes es la altura de la primera capa BKN u OVC. `skyc1` solo, como ordinal CLR < FEW < SCT < BKN < OVC.
@@ -874,10 +737,10 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P10 · Variables de calendario y ruta
 
-- **Responsable:** Camilo. **Estado:** ◐.
+- **Responsable:** Camilo.
 - **Qué:**
-  - Hora programada codificada de forma cíclica con seno y coseno; día de la semana; mes; festivo [S03]. **Ya hecho.**
-  - Distancia y rumbo. **Ya hecho.**
+  - Hora programada codificada de forma cíclica con seno y coseno; día de la semana; mes; festivo [S03].
+  - Distancia y rumbo.
   - Aerolínea, origen y destino como nominales. Los niveles raros se agrupan en «otros», con el umbral aprendido en train [S03].
   - Tamaño FAA del aeropuerto de origen, para equidad y también como variable.
 - **Por qué:** los códigos enteros (`OriginAirportID`) son nominales aunque se guarden como números [Playbook §2].
@@ -885,7 +748,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P11 · EDA guiado por preguntas
 
-- **Responsables:** Camilo (`01_eda_bts`) y Emilio (`02_eda_weather`). **Estado:** ○. [S02, Playbook §2]
+- **Responsables:** Camilo (`01_eda_bts`) y Emilio (`02_eda_weather`). [S02, Playbook §2]
 - **Qué:**
   - Perfilado mínimo: forma, tipos, `nunique`, ausentes por columna, fila, fuente y **tiempo**, y cuantiles.
   - Prevalencia de retraso por mes. Se predijo entre el 20 % y el 30 % [D Coste de cada error]: escribir el resultado junto a la predicción.
@@ -897,7 +760,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P12 · Partición temporal con separación
 
-- **Responsable:** Camilo, con Alberto y Dylan. **Estado:** ◐. [S04, S07]
+- **Responsable:** Camilo, con Alberto y Dylan. [S04, S07]
 - **Qué:**
 
 | Conjunto | Periodo | Uso |
@@ -915,30 +778,27 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### P13 · Transformaciones dentro de un `Pipeline`
 
-- **Responsable:** Camilo, con Alberto y Dylan. **Estado:** ○.
+- **Responsable:** Camilo, con Alberto y Dylan.
 - **Qué:** imputación, escalado y codificación dentro de un `ColumnTransformer` + `Pipeline` de scikit-learn, ajustado solo con train y aplicado a validación y test.
 - **Por qué:** es la ruta de fuga por transformación [S03]. En la validación cruzada, los escaladores se recalculan dentro de cada entrenamiento [S06 «Separación experimental»].
 - **Hecho cuando:** el `Pipeline` serializado se carga en el notebook 06 sin reajustarse.
 
 #### P14 · Calidad y congelación de datos
 
-- **Responsable:** Emilio, con Camilo. **Estado:** ◐.
+- **Responsable:** Emilio, con Camilo.
 - **Qué:**
   - Tabla de calidad (*scorecard*) con reglas CRITICAL y WARNING, y decisión por lote: ACEPTAR, NOTIFICAR o CUARENTENA [Playbook §1.5].
   - Informe de calidad con las ocho dimensiones del Playbook §1.4. Representatividad y cobertura son las que más importan aquí.
   - Congelar: guardar train, validación y test en Parquet con su *hash* y fecha. Desde ese momento nadie toca los datos sin una fila nueva en el registro.
-- **Ya hecho:** `save_splits` guarda los conjuntos.
 - **Hecho cuando:** existen `data/processed/splits/*.parquet`, `results/quality_report.md` y un manifiesto de ejecución con *hashes* [Playbook].
 
 ### Fase 2 · Clasificación
 
 **Diseño:** un clasificador multiclase de seis clases. De él sale la probabilidad binaria que necesita el pasajero: `P(retraso) = 1 − P(sin retraso)`. El umbral y la equidad se evalúan sobre esa binaria. La causa se evalúa por clase, uno contra el resto.
 
-**Estado del notebook 04** (rama de Alberto): 52 celdas escritas, ninguna ejecutada. Ya trae curvas PR, `average_precision`, `Pipeline` con escalado y búsqueda con `TimeSeriesSplit`. Le sobran SMOTE, el submuestreo e `is_unbalance`, y le falta la parte fuera de pliegue.
-
 #### C1 · Baselines
 
-- **Responsable:** Alberto. **Estado:** ◐. [S05]
+- **Responsable:** Alberto. [S05]
 - **Qué:**
   - `DummyClassifier(strategy="prior")`: el AUC-PR de referencia es la prevalencia [S04].
   - Regla simple: «se retrasa si la ventana de retrasos recientes tiene mediana ≥ 15». Es la referencia de regla sencilla que pide [S04].
@@ -948,7 +808,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### C2 · Modelos candidatos
 
-- **Responsable:** Alberto. **Estado:** ◐. [S08–S11]
+- **Responsable:** Alberto. [S08–S11]
 
 | Modelo | Sesión | Hiperparámetros a explorar |
 |---|---|---|
@@ -964,7 +824,7 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### C3 · Optimización de hiperparámetros
 
-- **Responsable:** Alberto. **Estado:** ◐. [S07]
+- **Responsable:** Alberto. [S07]
 - **Qué:**
   - Búsqueda aleatoria o *successive halving*, con escala logarítmica para tasas y regularización.
   - Cada configuración pasa por los mismos bloques temporales de P12, con las transformaciones aprendidas dentro de cada bloque.
@@ -975,14 +835,14 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### C4 · Diagnóstico de capacidad
 
-- **Responsable:** Alberto. **Estado:** ○. [S06]
+- **Responsable:** Alberto. [S06]
 - **Qué:** brecha entre train y validación por modelo; curva de aprendizaje con fracciones crecientes de train para el mejor modelo.
 - **Por qué:** dice si conviene más datos (población completa) o más capacidad [S06 «Más datos pueden revelar qué limita el aprendizaje»].
 - **Hecho cuando:** hay una figura y una frase de interpretación en la memoria.
 
 #### C5 · Calibración y umbral
 
-- **Responsable:** Alberto, con Dylan. **Estado:** ○. [S04]
+- **Responsable:** Alberto, con Dylan. [S04]
 - **Qué:**
   - Diagrama de fiabilidad, Brier y log-loss de la binaria en validación.
   - Si está mal calibrada, recalibrar con un subconjunto de desarrollo que el modelo no vio. La técnica concreta (isotónica o Platt) está **fuera del temario**: justificarla, o reportar la descalibración como limitación.
@@ -992,14 +852,14 @@ Son arreglos de ingeniería: no cambian el modelo, pero sin ellos nadie más pue
 
 #### C6 · Evaluación de la causa
 
-- **Responsable:** Alberto. **Estado:** ○.
+- **Responsable:** Alberto.
 - **Qué:** AUC-PR uno contra el resto por causa, y su media macro; matriz de confusión entre causas, solo en vuelos retrasados.
 - **Por qué:** la media macro no deja que las clases grandes tapen a las pequeñas [S04 micro/macro/ponderada].
 - **Hecho cuando:** hay una tabla por clase con soporte. Las clases que no se aprenden se dicen claramente.
 
 #### C7 · Probabilidades fuera de pliegue para el regresor
 
-- **Responsable:** Alberto, con Dylan. **Estado:** ○. [S11 Stacking]
+- **Responsable:** Alberto, con Dylan. [S11 Stacking]
 - **Qué:**
   - Dividir train en los bloques temporales de P12.
   - Para cada bloque k, entrenar el clasificador final con los bloques anteriores y predecir el bloque k.
@@ -1016,7 +876,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### R1 · Baselines
 
-- **Responsable:** Dylan. **Estado:** ○. [S05]
+- **Responsable:** Dylan. [S05]
 - **Qué:**
   - Constante 0: «llega a su hora».
   - Mediana de train: el óptimo para el error absoluto.
@@ -1027,7 +887,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### R2 · Modelos
 
-- **Responsable:** Dylan. **Estado:** ○. [S05, S06, S09–S11]
+- **Responsable:** Dylan. [S05, S06, S09–S11]
 
 | Modelo | Sesión | Nota |
 |---|---|---|
@@ -1042,7 +902,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### R3 · Métricas y cola larga
 
-- **Responsable:** Dylan. **Estado:** ○.
+- **Responsable:** Dylan.
 - **Qué:**
   - Métrica principal: **MAE**, en minutos e interpretable por el pasajero. Secundarias: RMSE, que castiga la cola, y R².
   - MAPE no se usa: `ArrDelay` vale 0 o es negativo en muchos vuelos [S04, cuidado con MAPE].
@@ -1055,7 +915,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### R4 · Residuos y capacidad
 
-- **Responsable:** Dylan. **Estado:** ○. [S05, S06]
+- **Responsable:** Dylan. [S05, S06]
 - **Qué:** residuos frente a predicción, frente a hora del día y frente a tamaño de aeropuerto; brecha entre train y validación; curva de aprendizaje.
 - **Hecho cuando:** cada patrón visible tiene una frase de interpretación.
 
@@ -1063,7 +923,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### I1 · Regresor con y sin probabilidades
 
-- **Responsable:** Dylan, con Emilio. **Estado:** ○.
+- **Responsable:** Dylan, con Emilio.
 - **Qué:**
   - El mismo modelo y la misma búsqueda, con dos conjuntos de variables: sin probabilidades y con las seis probabilidades fuera de pliegue de C7.
   - Comparación pareada por bloque (Δk) [S07]: cuántos bloques mejora, la mejora media y su dispersión.
@@ -1073,7 +933,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### I2 · Selección final y test único
 
-- **Responsable:** Emilio, con Alberto y Dylan. **Estado:** ○. [S07]
+- **Responsable:** Emilio, con Alberto y Dylan. [S07]
 - **Qué:**
   1. Elegir clasificador y regresor con validación cruzada y confirmar en validación.
   2. Reentrenar ambos con todo desarrollo (train + validación).
@@ -1084,7 +944,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### I3 · Análisis de errores por grupos
 
-- **Responsable:** Emilio, con Alberto y Dylan. **Estado:** ○.
+- **Responsable:** Emilio, con Alberto y Dylan.
 - **Qué:**
   - Por tamaño de aeropuerto (FAA), mes y estación, aerolínea y hora del día.
   - Clasificación: ROC por grupo y periodo; recall al umbral de demo por grupo [D Coste de cada error], [D Grupos].
@@ -1095,13 +955,13 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### I4 · Interpretación
 
-- **Responsables:** Alberto (clasificación) y Dylan (regresión), con Emilio. **Estado:** ○.
+- **Responsables:** Alberto (clasificación) y Dylan (regresión), con Emilio.
 - **Qué:** coeficientes de la logística y de Ridge [S05]; importancia por impureza en el bosque [S10], con su límite: «la importancia no explica causalidad» y favorece variables con muchos cortes.
 - **Fuera del temario:** SHAP no aparece en el material de clase. Si se usa, justificarlo y saber explicarlo en la defensa. Si no, basta con lo de clase.
 
 #### I5 · Propuesta de uso
 
-- **Responsable:** Emilio, con Dylan. **Estado:** ○.
+- **Responsable:** Emilio, con Dylan.
 - **Qué:**
   - Una función `predict_flight(clave)` que, a T_corte, devuelve un JSON con: `P(retraso)`, la causa más probable con su probabilidad, minutos estimados de retraso y la hora estimada de llegada.
   - Si el vuelo ya figura cancelado, la predicción vuelve vacía con un aviso [D Cancelados].
@@ -1110,7 +970,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### I6 · Ciclo de vida
 
-- **Responsable:** Emilio, con Camilo. **Estado:** ○. [Rúbrica 5 %]
+- **Responsable:** Emilio, con Camilo. [Rúbrica 5 %]
 - **Qué** (en la memoria, una página):
   - Operación: a qué hora se ejecuta y qué fuentes consulta en ese momento.
   - Monitorización: prevalencia predicha frente a real cada mes; deriva de las variables principales; calibración mensual.
@@ -1119,9 +979,9 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### I7 · Reproducibilidad
 
-- **Responsable:** Emilio, con todos. **Estado:** ◐. [Enunciado]
+- **Responsable:** Emilio, con todos. [Enunciado]
 - **Qué:**
-  - Semillas fijas (`utils.set_seed`, `RANDOM_STATE = 42`). **Ya hecho.**
+  - Semillas fijas (`utils.set_seed`, `RANDOM_STATE = 42`).
   - Dependencias con versión fijada (B5) y datos verificables (B8).
   - `README.md` como punto de entrada: estructura, entorno, acceso a datos, orden de ejecución, cómo reproducir y dónde están modelos, métricas y figuras.
   - Notebooks guardados con sus salidas. Hoy el 04 no está ejecutado [Reunión §3].
@@ -1132,7 +992,7 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### E1 · Memoria
 
-- **Responsable:** Emilio; cada persona escribe la sección de su fase. **Estado:** ○.
+- **Responsable:** Emilio; cada persona escribe la sección de su fase.
 - 16 páginas de contenido, 20 en total.
 
 | Sección del enunciado | Páginas | Sale de | Escribe |
@@ -1153,16 +1013,16 @@ Escrita para `ArrDelay`. La rama de `AirTime` se indica en cada tarea.
 
 #### E2 · Defensa
 
-- **Responsables:** todos. **Estado:** ○. 10 diapositivas, 10 minutos.
+- **Responsables:** todos. 10 diapositivas, 10 minutos.
 - Una idea por diapositiva: problema; datos y corte; fuga y cómo se evitó; partición; clasificación; regresión; integración (con y sin); errores por grupo; uso y ciclo de vida; conclusiones.
 - Todos participan con contenido sustantivo [Enunciado]. Cada integrante debe poder explicar cualquier diapositiva: el contenido generado con IA que el equipo no sepa explicar penaliza la nota.
 
 #### E3 · ZIP
 
-- **Responsable:** Emilio. **Estado:** ○.
+- **Responsable:** Emilio.
 - Estructura de la §8.2, notebooks ejecutados, `src/`, `config.py`, `requirements.txt`, manifiesto de datos y enlace a la Release o a la copia compartida.
 - Generarlo desde lo versionado, sin entornos ni cachés: `git archive --format=zip -o entrega.zip main`.
-- `.gitattributes` con `PLAN.md export-ignore` deja fuera la coordinación del equipo.
+- `.gitattributes` con `docs/PLAN.md export-ignore` y `docs/ESTADO.md export-ignore` deja fuera la coordinación del equipo.
 
 ---
 
